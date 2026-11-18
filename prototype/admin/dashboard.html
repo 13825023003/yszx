@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数据看板 · 云枢智学管理端</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+  <div id="adminAsideMount"></div>
+  <div class="admin-main">
+    <div id="adminTopbarMount"></div>
+    <main class="admin-content">
+
+      <div class="page-head">
+        <div>
+          <h1>数据看板</h1>
+          <div class="desc">今天也是内容与学员都在稳步增长的一天 · 2026-11-05 星期四</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-outline btn-sm" id="refreshBtn">↻ 刷新数据</button>
+          <a class="btn btn-primary btn-sm" href="roadmaps.html?new=1">+ 创建学习路线</a>
+        </div>
+      </div>
+
+      <!-- 统计卡 -->
+      <div class="admin-stats" id="statCards"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start" class="dash-grid">
+        <!-- 折线图 -->
+        <div class="a-card">
+          <div class="a-card-head">
+            <div>
+              <h3>用户增长趋势</h3>
+              <div class="sub">新增注册用户数</div>
+            </div>
+            <div class="seg" id="rangeSeg">
+              <button class="active" data-days="7">7 天</button>
+              <button data-days="30">30 天</button>
+              <button data-days="90">90 天</button>
+            </div>
+          </div>
+          <div class="a-card-body" style="padding:16px 20px 12px">
+            <div class="row-between mb-8">
+              <div class="row gap-16">
+                <div><span class="small muted">累计新增</span><div style="font-size:20px;font-weight:800" id="growthTotal">—</div></div>
+                <div><span class="small muted">日均</span><div style="font-size:20px;font-weight:800" id="growthAvg">—</div></div>
+              </div>
+              <div class="chart-legend"><span><i style="background:#6366f1"></i>新增用户</span></div>
+            </div>
+            <div class="chart-line-wrap" id="lineChart"></div>
+          </div>
+        </div>
+
+        <!-- 快捷操作 -->
+        <div class="a-card">
+          <div class="a-card-head"><h3>快捷操作</h3></div>
+          <div class="a-card-body">
+            <div class="quick-ops">
+              <a class="quick-op" href="roadmaps.html">
+                <span class="qo-i" style="background:#eef2ff">🗺</span>
+                <div><b>管理学习路线</b><span>查看、编辑与排序课程</span></div>
+              </a>
+              <a class="quick-op" href="roadmaps.html?new=1">
+                <span class="qo-i" style="background:#f5f3ff">＋</span>
+                <div><b>创建新路线</b><span>为学科编排一条新的学习路径</span></div>
+              </a>
+              <a class="quick-op" href="courses.html">
+                <span class="qo-i" style="background:#ecfdf3">🎬</span>
+                <div><b>B站课程库</b><span>维护可复用的课程资源</span></div>
+              </a>
+            </div>
+            <div class="divider"></div>
+            <div class="row-between">
+              <div>
+                <div class="small muted">待审核题目</div>
+                <div style="font-size:22px;font-weight:800;color:var(--warn)">6</div>
+              </div>
+              <a class="btn btn-outline btn-sm" href="question-bank.html?status=pending">去审核 →</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1.15fr;gap:16px;margin-top:16px" class="dash-grid2">
+        <!-- 学科分布 -->
+        <div class="a-card">
+          <div class="a-card-head">
+            <div><h3>题目学科分布</h3><div class="sub">按学科统计题目数量</div></div>
+            <a class="small link" href="subjects.html">学科管理 →</a>
+          </div>
+          <div class="a-card-body"><div class="bar-dist" id="subjectDist"></div></div>
+        </div>
+
+        <!-- 最近活动 -->
+        <div class="a-card">
+          <div class="a-card-head">
+            <div><h3>最近活动</h3><div class="sub">最近 5 条后台操作记录</div></div>
+            <a class="small link" href="logs.html">查看全部 →</a>
+          </div>
+          <div class="a-card-body no-pad">
+            <div class="table-wrap">
+              <table class="table">
+                <thead><tr><th>用户</th><th>操作</th><th>详情</th><th>时间</th></tr></thead>
+                <tbody id="activityBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script>
+(function () {
+  if (!Admin.renderShell('dashboard')) return;
+  UI.bindModals();
+
+  /* ---------- 统计卡 ---------- */
+  const stats = [
+    { label: '学科数量', value: DB.SUBJECTS.length, icon: '📚', bg: '#eef2ff', color: '#4f46e5', trend: '较上月 <b class="up">+2 个</b>' },
+    { label: '题目数量', value: DB.ALL_QUESTIONS.length + 3024, icon: '📝', bg: '#ecfdf3', color: '#12b76a', trend: '本周新增 <b class="up">+86 道</b>' },
+    { label: '注册用户', value: 12480, icon: '👥', bg: '#fffaeb', color: '#f79009', trend: '较昨日 <b class="up">+12.4%</b>' },
+    { label: 'AI 面试次数', value: 38600, icon: '🎙', bg: '#f5f3ff', color: '#7c3aed', trend: '本周 <b class="up">+1,286 次</b>' }
+  ];
+  document.getElementById('statCards').innerHTML = stats.map(s => `
+    <div class="a-stat">
+      <div class="as-top">
+        <span class="as-label">${s.label}</span>
+        <span class="as-icon" style="background:${s.bg};color:${s.color}">${s.icon}</span>
+      </div>
+      <div class="as-num">${s.value.toLocaleString()}</div>
+      <div class="as-trend">${s.trend}</div>
+    </div>`).join('');
+
+  /* ---------- 折线图 ---------- */
+  let chartDays = 7;
+  function renderLineChart(days) {
+    chartDays = days;
+    const values = DB.GROWTH[days];
+    const labels = days === 7 ? ['10/30','10/31','11/01','11/02','11/03','11/04','今日']
+      : days === 30 ? Array.from({ length: 30 }, (_, i) => `${i + 1}日`)
+      : Array.from({ length: 90 }, (_, i) => `${i + 1}日`);
+    const total = values.reduce((a, b) => a + b, 0);
+    document.getElementById('growthTotal').textContent = total.toLocaleString();
+    document.getElementById('growthAvg').textContent = Math.round(total / days) + ' / 天';
+
+    const W = 720, H = 250, P = { l: 42, r: 16, t: 18, b: 30 };
+    const max = Math.max(...values) * 1.15;
+    const min = 0;
+    const innerW = W - P.l - P.r, innerH = H - P.t - P.b;
+    const x = i => P.l + (values.length === 1 ? innerW / 2 : i / (values.length - 1) * innerW);
+    const y = v => P.t + innerH - (v - min) / (max - min) * innerH;
+
+    let line = '', area = '';
+    values.forEach((v, i) => {
+      line += (i === 0 ? 'M' : 'L') + x(i).toFixed(1) + ',' + y(v).toFixed(1) + ' ';
+    });
+    area = line + `L${x(values.length - 1).toFixed(1)},${P.t + innerH} L${P.l},${P.t + innerH} Z`;
+
+    // 网格
+    let grid = '';
+    for (let i = 0; i <= 4; i++) {
+      const gy = P.t + innerH / 4 * i;
+      const val = Math.round(max - (max / 4) * i);
+      grid += `<line x1="${P.l}" y1="${gy}" x2="${W - P.r}" y2="${gy}" stroke="#f0f1f5" stroke-width="1"/>
+        <text x="${P.l - 9}" y="${gy + 4}" text-anchor="end" font-size="10" fill="#98a2b3">${val}</text>`;
+    }
+
+    // 点
+    let dots = '';
+    const step = values.length > 30 ? Math.ceil(values.length / 12) : (values.length > 10 ? 2 : 1);
+    values.forEach((v, i) => {
+      if (i % step === 0 || i === values.length - 1) {
+        dots += `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.2" fill="#fff" stroke="#6366f1" stroke-width="2">
+          <title>${labels[i]}：${v} 人</title></circle>`;
+      }
+    });
+
+    // x 轴标签
+    let xLabels = '';
+    const labelIdx = days === 7 ? values.map((_, i) => i) : [0, Math.floor(values.length / 3), Math.floor(values.length * 2 / 3), values.length - 1];
+    labelIdx.forEach(i => {
+      xLabels += `<text x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="${i === 0 ? 'start' : i === values.length - 1 ? 'end' : 'middle'}" font-size="10" fill="#98a2b3">${labels[i]}</text>`;
+    });
+
+    document.getElementById('lineChart').innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:100%;overflow:visible" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#6366f1" stop-opacity=".22"/>
+            <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        ${grid}
+        <path d="${area}" fill="url(#areaGrad)"/>
+        <path d="${line}" fill="none" stroke="#6366f1" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+          stroke-dasharray="2000" stroke-dashoffset="2000">
+          <animate attributeName="stroke-dashoffset" from="2000" to="0" dur="1.1s" fill="freeze"/>
+        </path>
+        ${dots}${xLabels}
+      </svg>`;
+  }
+  renderLineChart(7);
+
+  document.getElementById('rangeSeg').addEventListener('click', e => {
+    const b = e.target.closest('button[data-days]'); if (!b) return;
+    document.querySelectorAll('#rangeSeg button').forEach(x => x.classList.toggle('active', x === b));
+    renderLineChart(+b.dataset.days);
+  });
+
+  /* ---------- 学科分布 ---------- */
+  const maxCount = Math.max(...DB.SUBJECTS.map(s => s.stages.reduce((n, st) => n + st.questions.length, 0)));
+  document.getElementById('subjectDist').innerHTML = DB.SUBJECTS.map(s => {
+    const n = s.stages.reduce((sum, st) => sum + st.questions.length, 0);
+    return `<div class="bd-row">
+      <span class="bd-name" title="${UI.esc(s.name)}"><span>${s.icon}</span>${UI.esc(s.name)}</span>
+      <span class="bd-track"><span class="bd-fill" style="width:${n / maxCount * 100}%;background:${s.color}"></span></span>
+      <span class="bd-val">${n}</span>
+    </div>`;
+  }).join('');
+
+  /* ---------- 最近活动 ---------- */
+  document.getElementById('activityBody').innerHTML = DB.LOGS.slice(0, 5).map(l => `
+    <tr>
+      <td><div class="user-cell"><span class="mini-avatar">${UI.initial(l.user)}</span><span class="uc-n">${UI.esc(l.user)}</span></div></td>
+      <td><span class="badge ${l.action === '删除' ? 'badge-danger' : l.action === '审核' ? 'badge-warn' : l.action === '登录' ? 'badge-info' : 'badge-brand'}">${UI.esc(l.action)}</span></td>
+      <td style="max-width:260px" class="ellipsis" title="${UI.esc(l.detail)}">${UI.esc(l.target)}</td>
+      <td class="small muted nowrap">${l.time.slice(5, 16)}</td>
+    </tr>`).join('');
+
+  document.getElementById('refreshBtn').onclick = () => {
+    UI.toast('数据已刷新', 'success');
+    renderLineChart(chartDays);
+  };
+})();
+</script>
+<style>
+  @media (max-width: 1180px) {
+    .dash-grid, .dash-grid2 { grid-template-columns: 1fr !important; }
+  }
+</style>
+</body>
+</html>

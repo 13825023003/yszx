@@ -1,0 +1,46 @@
+# ============================================================================
+# 开发环境配置
+# 默认值对齐 deploy/env/.env.example，保证 docker compose up -d 后可直接启动。
+# 这些默认口令仅用于本地开发，生产环境必须通过环境变量覆盖（见 application-prod.yml）。
+# ============================================================================
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:yszx}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectionTimeZone=UTC
+    username: ${MYSQL_USER:yszx}
+    password: ${MYSQL_PASSWORD:YszxApp_2026}
+    hikari:
+      pool-name: yszx-hikari
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:YszxRedis_2026}
+      timeout: 3s
+      lettuce:
+        shutdown-timeout: 200ms
+
+app:
+  jwt:
+    portal:
+      # 仅开发环境使用；长度 >= 32 字节（HS256 要求）
+      secret: ${JWT_PORTAL_SECRET:dev-portal-secret-0123456789abcdef0123456789abcdef}
+    admin:
+      secret: ${JWT_ADMIN_SECRET:dev-admin-secret-0123456789abcdef0123456789abcdef}
+  storage:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:yszxminio}
+    secret-key: ${MINIO_SECRET_KEY:YszxMinio_2026}
+  ai:
+    base-url: ${AI_BASE_URL:}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:}
+
+logging:
+  level:
+    com.yunshu.zhixue: DEBUG

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>学员管理 · 云枢智学管理端</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+  <div id="adminAsideMount"></div>
+  <div class="admin-main">
+    <div id="adminTopbarMount"></div>
+    <main class="admin-content">
+
+      <div class="page-head">
+        <div>
+          <h1>学员管理</h1>
+          <div class="desc">管理前台注册学员，学员账号由学员自行注册产生</div>
+        </div>
+      </div>
+
+      <div class="admin-stats" style="grid-template-columns:repeat(4,1fr)" id="studentStats"></div>
+
+      <div class="a-card">
+        <div class="a-toolbar">
+          <div class="search"><i>🔍</i><input class="input" id="stKw" placeholder="搜索昵称 / 手机号" /></div>
+          <select class="select" id="stStatus">
+            <option value="">全部状态</option>
+            <option value="enabled">已启用</option>
+            <option value="disabled">已禁用</option>
+          </select>
+          <div class="spacer"></div>
+          <span class="small muted" id="stHint"></span>
+        </div>
+
+        <div class="a-batchbar" id="batchBar">
+          <span>已选择 <span class="count" id="selectedCount">0</span> 名学员</span>
+          <div class="spacer"></div>
+          <button class="btn btn-success-soft btn-xs" data-batch="enable" data-perm="editStudents">批量启用</button>
+          <button class="btn btn-outline btn-xs" data-batch="disable" data-perm="editStudents">批量禁用</button>
+          <button class="btn btn-danger-soft btn-xs" data-batch="delete" data-perm="deleteStudents">批量删除</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="check-col"><input type="checkbox" id="checkAll" /></th>
+                <th>学员</th>
+                <th style="width:150px">手机号</th>
+                <th style="width:130px">注册时间</th>
+                <th style="width:110px">学习天数</th>
+                <th style="width:150px">刷题 · 面试</th>
+                <th style="width:90px">状态</th>
+                <th style="width:190px">操作</th>
+              </tr>
+            </thead>
+            <tbody id="stBody"></tbody>
+          </table>
+        </div>
+        <div id="stEmpty" style="display:none"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- 学员详情 -->
+<div class="modal-mask" id="studentModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div><h3>学员详情</h3><div class="sub" id="stModalSub"></div></div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body" id="stDetailBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>关闭</button>
+      <button class="btn btn-primary" id="detailToggleBtn" data-perm="editStudents">禁用账号</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script>
+(function () {
+  if (!Admin.renderShell('students')) return;
+  UI.bindModals();
+
+  let students = Admin.copy(Admin.getStudents());
+  let filters = { kw: '', status: '' };
+  const selected = new Set();
+  let detailId = null;
+
+  const save = () => Admin.saveStudents(students);
+  const masked = p => p ? p.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') : '—';
+  const courseCount = s => Math.max(0, Math.min(18, Math.floor((s.days || 0) / 4) + (s.id.charCodeAt(1) % 4)));
+
+  function renderStats() {
+    const enabled = students.filter(s => s.status === 'enabled').length;
+    const avgAcc = students.length ? Math.round(students.reduce((n, s) => n + (s.accuracy || 0), 0) / students.length) : 0;
+    const totalInterviews = students.reduce((n, s) => n + (s.interviews || 0), 0);
+    const data = [
+      { label: '学员总数', value: students.length, icon: '👥', bg: '#eef2ff' },
+      { label: '已启用', value: enabled, icon: '✅', bg: '#ecfdf3' },
+      { label: '平均正确率', value: avgAcc + '%', icon: '🎯', bg: '#fffaeb' },
+      { label: '累计 AI 面试', value: totalInterviews + ' 次', icon: '🎙', bg: '#f5f3ff' }
+    ];
+    document.getElementById('studentStats').innerHTML = data.map(s => `
+      <div class="a-stat">
+        <div class="as-top"><span class="as-label">${s.label}</span><span class="as-icon" style="background:${s.bg}">${s.icon}</span></div>
+        <div class="as-num">${s.value}</div>
+        <div class="as-trend">前台注册学员实时统计</div>
+      </div>`).join('');
+  }
+
+  function filtered() {
+    const kw = filters.kw.trim().toLowerCase();
+    return students.filter(s => {
+      if (kw && !(s.name.toLowerCase().includes(kw) || s.phone.includes(kw))) return false;
+      if (filters.status && s.status !== filters.status) return false;
+      return true;
+    });
+  }
+
+  function render() {
+    renderStats();
+    const list = filtered();
+    document.getElementById('stHint').textContent = `共 ${list.length} 名学员`;
+    const body = document.getElementById('stBody');
+    const empty = document.getElementById('stEmpty');
+    if (!list.length) {
+      body.innerHTML = '';
+      empty.style.display = '';
+      empty.innerHTML = `<div class="empty"><div class="em-icon">👥</div><div class="em-title">没有找到匹配的学员</div><div class="em-sub">试试调整搜索关键词或状态筛选</div></div>`;
+      updateBatchBar();
+      Admin.applyPermissions();
+      return;
+    }
+    empty.style.display = 'none';
+    body.innerHTML = list.map(s => `
+      <tr>
+        <td><input type="checkbox" class="row-check" data-id="${s.id}" ${selected.has(s.id) ? 'checked' : ''}></td>
+        <td>
+          <div class="user-cell">
+            <span class="mini-avatar" style="background:linear-gradient(135deg,#818cf8,#c084fc)">${UI.esc(UI.initial(s.name))}</span>
+            <div><div class="uc-n">${UI.esc(s.name)}</div><div class="uc-s">${UI.esc(s.email || '未填写邮箱')}</div></div>
+          </div>
+        </td>
+        <td class="small">${UI.esc(masked(s.phone))}</td>
+        <td class="small muted">${UI.esc(s.regDate)}</td>
+        <td><b>${s.days}</b> <span class="small muted">天</span></td>
+        <td class="small"><b>${s.questions}</b> 题 · <b>${s.interviews}</b> 次</td>
+        <td>${s.status === 'enabled' ? '<span class="badge badge-success">已启用</span>' : '<span class="badge badge-danger">已禁用</span>'}</td>
+        <td><div class="inline-actions">
+          <button data-act="detail" data-id="${s.id}">查看详情</button>
+          <button data-act="toggle" data-id="${s.id}" data-perm="editStudents">${s.status === 'enabled' ? '禁用' : '启用'}</button>
+          <button class="danger" data-act="delete" data-id="${s.id}" data-perm="deleteStudents">删除</button>
+        </div></td>
+      </tr>`).join('');
+    updateBatchBar();
+    Admin.applyPermissions();
+    const all = document.getElementById('checkAll');
+    if (all) all.checked = list.length > 0 && list.every(s => selected.has(s.id));
+  }
+
+  function updateBatchBar() {
+    document.getElementById('batchBar').classList.toggle('show', selected.size > 0);
+    document.getElementById('selectedCount').textContent = selected.size;
+  }
+
+  function clearSelection() {
+    selected.clear();
+    document.querySelectorAll('.row-check').forEach(c => c.checked = false);
+    const all = document.getElementById('checkAll'); if (all) all.checked = false;
+    updateBatchBar();
+  }
+
+  /* ---------- 行操作 ---------- */
+  document.getElementById('stBody').addEventListener('click', async e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const s = students.find(x => x.id === b.dataset.id); if (!s) return;
+    if (b.dataset.act === 'detail') return openDetail(s.id);
+    if (b.dataset.act === 'toggle') {
+      s.status = s.status === 'enabled' ? 'disabled' : 'enabled';
+      save();
+      Admin.log(s.status === 'enabled' ? '启用' : '禁用', '学员「' + s.name + '」', s.status === 'enabled' ? '恢复学员账号' : '禁用学员账号');
+      render();
+      UI.toast(s.status === 'enabled' ? '学员已启用' : '学员已禁用', s.status === 'enabled' ? 'success' : 'info');
+      return;
+    }
+    if (b.dataset.act === 'delete') deleteStudents([s.id]);
+  });
+
+  async function deleteStudents(ids) {
+    const names = students.filter(s => ids.includes(s.id)).map(s => s.name).join('、');
+    const ok = await UI.confirm({
+      title: ids.length > 1 ? '批量删除学员' : '删除学员',
+      message: `确定删除学员「${names}」吗？删除后该学员的学习记录与面试记录将一并移除，且不可恢复。`,
+      confirmText: '确认删除', danger: true, icon: '🗑'
+    });
+    if (!ok) return;
+    students = students.filter(s => !ids.includes(s.id));
+    ids.forEach(id => selected.delete(id));
+    save();
+    Admin.log('删除', '学员管理', `批量删除 ${ids.length} 名学员：${names}`);
+    clearSelection(); render();
+    UI.toast(`已删除 ${ids.length} 名学员`, 'success');
+  }
+
+  /* ---------- 选择 ---------- */
+  document.getElementById('stBody').addEventListener('change', e => {
+    const c = e.target.closest('.row-check'); if (!c) return;
+    if (c.checked) selected.add(c.dataset.id); else selected.delete(c.dataset.id);
+    updateBatchBar();
+  });
+  document.getElementById('checkAll').addEventListener('change', e => {
+    document.querySelectorAll('.row-check').forEach(c => {
+      c.checked = e.target.checked;
+      if (e.target.checked) selected.add(c.dataset.id); else selected.delete(c.dataset.id);
+    });
+    updateBatchBar();
+  });
+
+  /* ---------- 批量 ---------- */
+  document.getElementById('batchBar').addEventListener('click', async e => {
+    const b = e.target.closest('[data-batch]'); if (!b) return;
+    const ids = [...selected]; if (!ids.length) return;
+    const act = b.dataset.batch;
+    if (act === 'delete') return deleteStudents(ids);
+    const status = act === 'enable' ? 'enabled' : 'disabled';
+    const label = act === 'enable' ? '启用' : '禁用';
+    const ok = await UI.confirm({
+      title: `批量${label}学员`,
+      message: `确定${label}选中的 ${ids.length} 名学员吗？${act === 'disable' ? '禁用后学员将无法登录前台。' : ''}`,
+      confirmText: `确认${label}`, danger: act === 'disable', icon: act === 'disable' ? '⛔' : '✓'
+    });
+    if (!ok) return;
+    students.forEach(s => { if (ids.includes(s.id)) s.status = status; });
+    save();
+    Admin.log(label, '学员管理', `批量${label} ${ids.length} 名学员`);
+    clearSelection(); render();
+    UI.toast(`已${label} ${ids.length} 名学员`, 'success');
+  });
+
+  /* ---------- 详情 ---------- */
+  function openDetail(id) {
+    const s = students.find(x => x.id === id); if (!s) return;
+    detailId = id;
+    document.getElementById('stModalSub').textContent = `ID：${s.id}`;
+    document.getElementById('stDetailBody').innerHTML = `
+      <div class="st-profile">
+        <span class="mini-avatar" style="width:58px;height:58px;font-size:18px;background:linear-gradient(135deg,#818cf8,#c084fc)">${UI.esc(UI.initial(s.name))}</span>
+        <div style="flex:1;min-width:0">
+          <div class="row gap-8 wrap"><span style="font-size:17px;font-weight:800">${UI.esc(s.name)}</span>
+            ${s.status === 'enabled' ? '<span class="badge badge-success">已启用</span>' : '<span class="badge badge-danger">已禁用</span>'}
+          </div>
+          <div class="small muted mt-8">注册于 ${UI.esc(s.regDate)} · 最近登录 ${UI.esc(s.lastLogin)}</div>
+        </div>
+      </div>
+      <div class="detail-section">
+        <div class="ds-label">资料信息</div>
+        <div class="detail-grid">
+          <div class="dg-i"><span class="k">手机号</span><span class="v">${UI.esc(masked(s.phone))}</span></div>
+          <div class="dg-i"><span class="k">邮箱</span><span class="v">${UI.esc(s.email || '—')}</span></div>
+          <div class="dg-i"><span class="k">注册时间</span><span class="v">${UI.esc(s.regDate)}</span></div>
+          <div class="dg-i"><span class="k">最后登录</span><span class="v">${UI.esc(s.lastLogin)}</span></div>
+        </div>
+      </div>
+      <div class="detail-section">
+        <div class="ds-label">学习统计</div>
+        <div class="st-stat-grid">
+          <div><b>${s.days}</b><span>学习天数</span></div>
+          <div><b>${courseCount(s)}</b><span>已学课程</span></div>
+          <div><b>${s.questions}</b><span>刷题总数</span></div>
+          <div><b style="color:${s.accuracy >= 80 ? 'var(--success)' : s.accuracy >= 65 ? 'var(--warn)' : 'var(--danger)'}">${s.accuracy}%</b><span>正确率</span></div>
+        </div>
+      </div>
+      <div class="detail-section" style="border-bottom:0;margin-bottom:0;padding-bottom:0">
+        <div class="ds-label">面试记录</div>
+        <div class="st-interview">
+          <span class="st-iv-icon">🎙</span>
+          <div><b>${s.interviews} 次</b><span>累计 AI 面试次数</span></div>
+          <a class="link small" href="interview-questions.html" style="margin-left:auto">面试题库管理 →</a>
+        </div>
+      </div>`;
+    const tgl = document.getElementById('detailToggleBtn');
+    tgl.textContent = s.status === 'enabled' ? '禁用账号' : '启用账号';
+    tgl.onclick = () => {
+      s.status = s.status === 'enabled' ? 'disabled' : 'enabled';
+      save();
+      Admin.log(s.status === 'enabled' ? '启用' : '禁用', '学员「' + s.name + '」', '学员详情页操作');
+      UI.close('studentModal');
+      render();
+      UI.toast(s.status === 'enabled' ? '学员已启用' : '学员已禁用', 'success');
+    };
+    UI.open('studentModal');
+    Admin.applyPermissions(document.getElementById('studentModal'));
+  }
+
+  /* ---------- 筛选 ---------- */
+  document.getElementById('stKw').addEventListener('input', UI.debounce(e => {
+    filters.kw = e.target.value; clearSelection(); render();
+  }, 300));
+  document.getElementById('stStatus').addEventListener('change', e => {
+    filters.status = e.target.value; clearSelection(); render();
+  });
+
+  render();
+})();
+</script>
+<style>
+  .st-profile { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+  .detail-section { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .ds-label { font-size: 12px; color: var(--muted); font-weight: 650; margin-bottom: 10px; letter-spacing: .03em; }
+  .st-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .st-stat-grid > div { background: #fafbfc; border-radius: 10px; padding: 13px 10px; text-align: center; }
+  .st-stat-grid b { display: block; font-size: 21px; font-weight: 800; }
+  .st-stat-grid span { font-size: 11.5px; color: var(--muted); }
+  .st-interview { display: flex; align-items: center; gap: 12px; padding: 13px 14px; background: #fafbfc; border-radius: 10px; }
+  .st-iv-icon { width: 36px; height: 36px; border-radius: 9px; background: var(--brand-soft); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .st-interview b { display: block; font-size: 17px; font-weight: 800; }
+  .st-interview span { font-size: 11.5px; color: var(--muted); }
+  .row-check, #checkAll { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; }
+  @media (max-width: 680px) { .st-stat-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</body>
+</html>

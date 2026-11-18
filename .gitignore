@@ -1,0 +1,23 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Backend
+backend/target/
+
+# Frontend
+portal-web/node_modules/
+portal-web/dist/
+admin-web/node_modules/
+admin-web/dist/
+
+# Local environment secrets
+deploy/.env

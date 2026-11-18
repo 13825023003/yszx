@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B站课程库 · 云枢智学管理端</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+  <div id="adminAsideMount"></div>
+  <div class="admin-main">
+    <div id="adminTopbarMount"></div>
+    <main class="admin-content">
+
+      <div class="page-head">
+        <div>
+          <h1>B站课程库</h1>
+          <div class="desc">维护可复用的 B 站课程资源，供学习路线自由编排</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-outline btn-sm" id="importBtn" data-perm="import">⇪ 批量导入</button>
+          <button class="btn btn-primary btn-sm" id="addCourseBtn" data-perm="create">+ 新增课程</button>
+        </div>
+      </div>
+
+      <div class="admin-stats" style="grid-template-columns:repeat(3,1fr)" id="courseStats"></div>
+
+      <div class="a-card">
+        <div class="a-toolbar">
+          <div class="search">
+            <i>🔍</i>
+            <input class="input" id="titleSearch" placeholder="搜索课程标题" />
+          </div>
+          <select class="select" id="subjectFilter"></select>
+          <select class="select" id="sourceFilter">
+            <option value="">全部来源</option>
+            <option value="B站">B站</option>
+            <option value="其他">其他</option>
+          </select>
+          <div class="spacer"></div>
+          <span class="small muted" id="resultHint"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="width:60px">序号</th>
+                <th style="width:96px">封面</th>
+                <th>课程名称</th>
+                <th style="width:110px">时长</th>
+                <th style="width:170px">学科</th>
+                <th style="width:90px">来源</th>
+                <th style="width:120px">操作</th>
+              </tr>
+            </thead>
+            <tbody id="courseBody"></tbody>
+          </table>
+        </div>
+        <div class="a-card-body" id="courseEmpty" style="display:none;padding:0"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- 新增/编辑课程 -->
+<div class="modal-mask" id="courseModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3 id="courseModalTitle">新增课程</h3>
+        <div class="sub">课程入库后可被任意学习路线引用</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field" id="f-cTitle">
+          <label class="req">课程名称</label>
+          <input class="input" id="cTitle" maxlength="60" placeholder="请输入课程名称" />
+          <div class="err-text">请输入课程名称</div>
+        </div>
+        <div class="form-grid cols-2">
+          <div class="field" id="f-cDuration">
+            <label class="req">时长</label>
+            <input class="input" id="cDuration" placeholder="如 3:06（小时:分钟）" />
+            <div class="hint">格式为「小时:分钟」，例如 3:06</div>
+            <div class="err-text">请输入正确时长，格式如 3:06</div>
+          </div>
+          <div class="field" id="f-cSubject">
+            <label class="req">所属学科</label>
+            <select class="select" id="cSubject"></select>
+            <div class="err-text">请选择所属学科</div>
+          </div>
+        </div>
+        <div class="form-grid cols-2">
+          <div class="field">
+            <label class="req">来源</label>
+            <select class="select" id="cSource">
+              <option value="B站">B站</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>课程链接</label>
+            <input class="input" id="cLink" placeholder="https://www.bilibili.com/video/BV..." />
+          </div>
+        </div>
+        <div class="field">
+          <label>封面图片 URL</label>
+          <input class="input" id="cCover" placeholder="留空则使用默认渐变封面" />
+          <div class="hint">支持 http/https 图片链接；填写后右侧实时预览</div>
+        </div>
+        <div class="cover-preview" id="coverPreview">
+          <span>课程封面预览</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="courseSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 批量导入 -->
+<div class="modal-mask" id="importModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div>
+        <h3>批量导入课程</h3>
+        <div class="sub">每行一门课程，字段使用英文竖线 | 分隔</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="import-tip">
+        <b>格式：</b>课程名称 | 时长(分钟) | 学科名称 | 来源 | 课程链接 | 封面URL(可选)
+        <button class="link small" id="fillSample" type="button">填入示例</button>
+      </div>
+      <textarea class="textarea" id="importText" rows="7" style="font-family:var(--mono);font-size:12px"
+        placeholder="大模型应用开发实战 | 186 | AI应用与智能体开发 | B站 | https://www.bilibili.com/video/BV1xx | https://example.com/cover.jpg"></textarea>
+      <div class="row-between mt-12">
+        <span class="small muted" id="lineHint">共 0 行</span>
+        <button class="btn btn-outline btn-sm" id="parseBtn">解析预览</button>
+      </div>
+      <div id="parsePreview" style="margin-top:14px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="confirmImport" disabled>确认导入</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script>
+(function () {
+  if (!Admin.renderShell('courses')) return;
+  UI.bindModals();
+
+  let courses = Admin.copy(Admin.getCourses());
+  let subjects = Admin.getSubjects();
+  const subjectOptions = subjects.map(s => ({ id: s.id, name: s.name })).concat([{ id: 'other', name: '其他学科' }]);
+  const subjName = id => (subjectOptions.find(s => s.id === id) || {}).name || '其他学科';
+  const COVERS = DB.COVERS;
+  let filters = { title: '', subject: '', source: '' };
+  let editId = null;
+  let parsed = null;
+
+  /* ---------- 工具 ---------- */
+  function durText(min) {
+    const h = Math.floor(min / 60), m = min % 60;
+    return h + ':' + String(m).padStart(2, '0');
+  }
+  function parseDur(str) {
+    const m = String(str).trim().match(/^(\d{1,2})\s*[:：]\s*(\d{1,2})$/);
+    if (!m) return null;
+    const h = +m[1], mi = +m[2];
+    if (mi > 59) return null;
+    return h * 60 + mi;
+  }
+  const coverBg = c => /^(https?:\/\/|data:image|\.\.\/)/.test(c.coverUrl || '') ? `background-image:url('${UI.esc(c.coverUrl)}');background-size:cover;background-position:center` : `background:${c.cover || COVERS[0]}`;
+
+  /* ---------- 统计 ---------- */
+  function renderStats() {
+    const totalMin = courses.reduce((n, c) => n + (c.minutes || 0), 0);
+    const subjSet = new Set(courses.map(c => c.subjectId).filter(id => id !== 'other'));
+    const data = [
+      { label: '课程总数', value: courses.length, suffix: ' 门', icon: '🎬', bg: '#eef2ff' },
+      { label: '总时长', value: (totalMin / 60).toFixed(1), suffix: ' 小时', icon: '⏱', bg: '#f5f3ff' },
+      { label: '关联学科数', value: subjSet.size, suffix: ' 个', icon: '📚', bg: '#ecfdf5' }
+    ];
+    document.getElementById('courseStats').innerHTML = data.map(s => `
+      <div class="a-stat">
+        <div class="as-top"><span class="as-label">${s.label}</span><span class="as-icon" style="background:${s.bg}">${s.icon}</span></div>
+        <div class="as-num">${s.value}<span style="font-size:13px;font-weight:600;color:var(--muted);margin-left:4px">${s.suffix}</span></div>
+        <div class="as-trend">不含「其他学科」口径统计</div>
+      </div>`).join('');
+  }
+
+  /* ---------- 筛选下拉 ---------- */
+  function fillFilters() {
+    document.getElementById('subjectFilter').innerHTML = '<option value="">全部学科</option>' +
+      subjectOptions.map(s => `<option value="${s.id}">${UI.esc(s.name)}</option>`).join('');
+    document.getElementById('cSubject').innerHTML = '<option value="">请选择学科</option>' +
+      subjectOptions.map(s => `<option value="${s.id}">${UI.esc(s.name)}</option>`).join('');
+  }
+
+  /* ---------- 表格 ---------- */
+  function filtered() {
+    const kw = filters.title.trim().toLowerCase();
+    return courses.filter(c => {
+      if (kw && !c.title.toLowerCase().includes(kw)) return false;
+      if (filters.subject && c.subjectId !== filters.subject) return false;
+      if (filters.source && c.source !== filters.source) return false;
+      return true;
+    });
+  }
+
+  function render() {
+    renderStats();
+    const list = filtered();
+    document.getElementById('resultHint').textContent = `共 ${list.length} 门课程`;
+    const body = document.getElementById('courseBody');
+    const empty = document.getElementById('courseEmpty');
+    if (!list.length) {
+      body.innerHTML = '';
+      empty.style.display = '';
+      empty.innerHTML = `<div class="empty"><div class="em-icon">🎬</div><div class="em-title">暂无匹配的课程</div><div class="em-sub">试试调整筛选条件，或新增一门课程</div></div>`;
+      return;
+    }
+    empty.style.display = 'none';
+    body.innerHTML = list.map((c, i) => `
+      <tr>
+        <td class="muted">${i + 1}</td>
+        <td><div class="cover-thumb" style="${coverBg(c)}">${c.coverUrl ? '' : '▶'}</div></td>
+        <td>
+          <div class="cell-main ellipsis" style="max-width:380px" title="${UI.esc(c.title)}">${UI.esc(c.title)}</div>
+          <div class="small muted mt-8">${c.bv ? 'BV ' + UI.esc(c.bv) : '未填写 BV 号'}${c.plays ? ' · ' + Admin.formatNum(c.plays) + ' 播放' : ''}</div>
+        </td>
+        <td class="nowrap">${durText(c.minutes)} <span class="small muted">(${c.minutes} 分钟)</span></td>
+        <td><span class="subject-chip">${UI.esc(subjName(c.subjectId))}</span></td>
+        <td><span class="badge ${c.source === 'B站' ? 'badge-info' : 'badge-gray'}">${UI.esc(c.source)}</span></td>
+        <td>
+          <div class="inline-actions">
+            <button data-act="edit" data-id="${c.id}" data-perm="edit">编辑</button>
+            <button class="danger" data-act="del" data-id="${c.id}" data-perm="delete">删除</button>
+          </div>
+        </td>
+      </tr>`).join('');
+    Admin.applyPermissions();
+  }
+
+  /* ---------- 课程表单 ---------- */
+  const courseModal = document.getElementById('courseModal');
+  function openCourse(id) {
+    editId = id || null;
+    const c = id ? courses.find(x => x.id === id) : null;
+    document.getElementById('courseModalTitle').textContent = c ? '编辑课程' : '新增课程';
+    document.getElementById('cTitle').value = c ? c.title : '';
+    document.getElementById('cDuration').value = c ? durText(c.minutes) : '';
+    document.getElementById('cSubject').value = c ? c.subjectId : '';
+    document.getElementById('cSource').value = c ? c.source : 'B站';
+    document.getElementById('cLink').value = c ? (c.url || (c.bv ? 'https://www.bilibili.com/video/' + c.bv : '')) : '';
+    document.getElementById('cCover').value = c ? (c.coverUrl || '') : '';
+    ['f-cTitle', 'f-cDuration', 'f-cSubject'].forEach(f => document.getElementById(f).classList.remove('invalid'));
+    updateCoverPreview();
+    UI.open(courseModal);
+    setTimeout(() => document.getElementById('cTitle').focus(), 100);
+  }
+
+  function updateCoverPreview() {
+    const url = document.getElementById('cCover').value.trim();
+    const el = document.getElementById('coverPreview');
+    if (/^https?:\/\//.test(url)) {
+      el.style.background = `#f2f4f7 url('${url.replace(/'/g, "\\'")}') center/cover no-repeat`;
+      el.innerHTML = '';
+    } else {
+      el.style.background = COVERS[courses.length % COVERS.length];
+      el.innerHTML = '<span>课程封面预览</span>';
+    }
+  }
+  document.getElementById('cCover').addEventListener('input', updateCoverPreview);
+
+  document.getElementById('addCourseBtn').onclick = () => openCourse();
+
+  document.getElementById('courseSave').onclick = () => {
+    const title = document.getElementById('cTitle').value.trim();
+    const minutes = parseDur(document.getElementById('cDuration').value);
+    const subjectId = document.getElementById('cSubject').value;
+    const source = document.getElementById('cSource').value;
+    const url = document.getElementById('cLink').value.trim();
+    const coverUrl = document.getElementById('cCover').value.trim();
+    const okT = !!title, okD = minutes !== null && minutes > 0, okS = !!subjectId;
+    document.getElementById('f-cTitle').classList.toggle('invalid', !okT);
+    document.getElementById('f-cDuration').classList.toggle('invalid', !okD);
+    document.getElementById('f-cSubject').classList.toggle('invalid', !okS);
+    if (!okT) { UI.toast('请输入课程名称', 'error'); return; }
+    if (!okD) { UI.toast('时长格式应为「小时:分钟」，如 3:06', 'error'); return; }
+    if (!okS) { UI.toast('请选择所属学科', 'error'); return; }
+
+    if (editId) {
+      const c = courses.find(x => x.id === editId);
+      Object.assign(c, { title, minutes, subjectId, source, url, coverUrl });
+      Admin.log('编辑', 'B站课程「' + title + '」', '更新课程信息');
+      UI.toast('课程已更新', 'success');
+    } else {
+      const bv = (url.match(/BV[0-9A-Za-z]+/) || [])[0] || '';
+      courses.unshift({
+        id: Admin.nextId('c'), title, minutes, subjectId, source, url, coverUrl,
+        bv, plays: 0, cover: COVERS[courses.length % COVERS.length]
+      });
+      Admin.log('新增', 'B站课程「' + title + '」', '来源 ' + source + '，所属学科 ' + subjName(subjectId));
+      UI.toast('课程已添加', 'success');
+    }
+    Admin.saveCourses(courses);
+    UI.close(courseModal);
+    render();
+  };
+
+  /* ---------- 删除 ---------- */
+  document.getElementById('courseBody').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-act]'); if (!btn) return;
+    const c = courses.find(x => x.id === btn.dataset.id); if (!c) return;
+    if (btn.dataset.act === 'edit') return openCourse(c.id);
+    const used = Admin.getRoutes().filter(r => (r.courseIds || []).includes(c.id)).length;
+    const ok = await UI.confirm({
+      title: '删除课程',
+      message: used ? `课程「${c.title}」正被 ${used} 条学习路线引用，删除后这些路线中将不再展示该课程。` : `确定删除课程「${c.title}」吗？删除后不可恢复。`,
+      confirmText: '确认删除', danger: true, icon: '🗑'
+    });
+    if (!ok) return;
+    courses = courses.filter(x => x.id !== c.id);
+    Admin.saveCourses(courses);
+    Admin.log('删除', 'B站课程「' + c.title + '」', used ? `逻辑删除，被 ${used} 条路线引用` : '逻辑删除');
+    UI.toast('课程已删除', 'success');
+    render();
+  });
+
+  /* ---------- 筛选 ---------- */
+  document.getElementById('titleSearch').addEventListener('input', UI.debounce(e => {
+    filters.title = e.target.value;
+    render();
+  }, 300));
+  document.getElementById('subjectFilter').addEventListener('change', e => { filters.subject = e.target.value; render(); });
+  document.getElementById('sourceFilter').addEventListener('change', e => { filters.source = e.target.value; render(); });
+
+  /* ---------- 批量导入 ---------- */
+  const importModal = document.getElementById('importModal');
+  const importText = document.getElementById('importText');
+  document.getElementById('importBtn').onclick = () => {
+    importText.value = '';
+    parsed = null;
+    renderPreview();
+    UI.open(importModal);
+  };
+  document.getElementById('fillSample').onclick = () => {
+    importText.value = [
+      '大模型应用开发实战 | 186 | AI应用与智能体开发 | B站 | https://www.bilibili.com/video/BV1GJ411x7h7',
+      'RAG 检索增强生成入门 | 95 | AI应用与智能体开发 | B站 | https://www.bilibili.com/video/BV1cL411E7qF | https://picsum.photos/seed/rag/320/180',
+      '提示词工程速成 | 40 | 提示词学院 | B站 | https://www.bilibili.com/video/BV1zP411h7Xw'
+    ].join('\n');
+    updateLineHint();
+  };
+  function updateLineHint() {
+    const n = importText.value.split('\n').filter(l => l.trim()).length;
+    document.getElementById('lineHint').textContent = `共 ${n} 行`;
+  }
+  importText.addEventListener('input', () => { updateLineHint(); parsed = null; renderPreview(); document.getElementById('confirmImport').disabled = true; });
+
+  document.getElementById('parseBtn').onclick = () => {
+    const lines = importText.value.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) { UI.toast('请先粘贴课程数据', 'error'); return; }
+    parsed = lines.map((line, i) => {
+      const cols = line.split('|').map(x => x.trim());
+      const [title, minStr, subjStr, source, link, cover] = cols;
+      const errs = [], warns = [];
+      if (cols.length < 5) errs.push('字段不足，至少需要「名称 | 时长 | 学科 | 来源 | 链接」');
+      if (!title) errs.push('课程名称不能为空');
+      const minutes = /^\d+$/.test(minStr || '') ? +minStr : NaN;
+      if (!(minutes > 0)) errs.push('时长必须为大于 0 的整数分钟');
+      let subjectId = null;
+      const found = subjectOptions.find(s => s.name === subjStr);
+      if (found) subjectId = found.id;
+      else if (subjStr === '其他' || subjStr === '其他学科') subjectId = 'other';
+      else warns.push(`学科「${subjStr || '空'}」不存在，将归入其他学科`);
+      if (!source) warns.push('未填写来源，默认按「其他」处理');
+      else if (!['B站', '其他', 'b站', 'Bilibili'].includes(source)) warns.push(`来源「${source}」无法识别，将按「其他」处理`);
+      if (!link) warns.push('缺少课程链接，导入后可补充');
+      else if (!/^https?:\/\//.test(link)) errs.push('课程链接需以 http(s):// 开头');
+      if (cover && !/^https?:\/\//.test(cover)) warns.push('封面 URL 无效，将使用默认封面');
+      return {
+        line: i + 1, title: title || '(未命名)', minutes, subjectId: subjectId || 'other',
+        source: source === 'B站' || source === 'b站' || source === 'Bilibili' ? 'B站' : '其他',
+        link: link || '', coverUrl: /^https?:\/\//.test(cover || '') ? cover : '',
+        errs, warns, raw: line
+      };
+    });
+    renderPreview();
+  };
+
+  function renderPreview() {
+    const box = document.getElementById('parsePreview');
+    if (!parsed) {
+      box.innerHTML = '';
+      document.getElementById('confirmImport').disabled = true;
+      document.getElementById('confirmImport').textContent = '确认导入';
+      return;
+    }
+    const valid = parsed.filter(p => !p.errs.length);
+    const warnCount = valid.filter(p => p.warns.length).length;
+    const invalid = parsed.length - valid.length;
+    box.innerHTML = `
+      <div class="parse-summary">
+        <span class="badge badge-success">有效 ${valid.length}</span>
+        <span class="badge badge-warn">警告 ${warnCount}</span>
+        <span class="badge badge-danger">无效 ${invalid}</span>
+        <span class="small muted" style="margin-left:auto">无效行将被跳过</span>
+      </div>
+      <div class="parse-list">
+        ${parsed.map(p => `
+          <div class="import-row ${p.errs.length ? 'err' : p.warns.length ? 'warn' : ''}">
+            <span class="ir-badge badge ${p.errs.length ? 'badge-danger' : p.warns.length ? 'badge-warn' : 'badge-success'}">${p.errs.length ? '无效' : p.warns.length ? '警告' : '有效'}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600" class="ellipsis">第 ${p.line} 行 · ${UI.esc(p.title)}</div>
+              <div class="small muted">${p.errs.concat(p.warns).map(x => UI.esc(x)).join('；') || `时长 ${p.minutes} 分钟 · ${UI.esc(subjName(p.subjectId))}`}</div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+    const btn = document.getElementById('confirmImport');
+    btn.disabled = valid.length === 0;
+    btn.textContent = `确认导入 ${valid.length} 门课程`;
+  }
+
+  document.getElementById('confirmImport').onclick = () => {
+    if (!parsed) return;
+    const valid = parsed.filter(p => !p.errs.length);
+    if (!valid.length) return;
+    valid.forEach(p => {
+      courses.unshift({
+        id: Admin.nextId('c'), title: p.title, minutes: p.minutes, subjectId: p.subjectId,
+        source: p.source, url: p.link, coverUrl: p.coverUrl, plays: 0,
+        bv: (p.link.match(/BV[0-9A-Za-z]+/) || [])[0] || '',
+        cover: COVERS[courses.length % COVERS.length]
+      });
+    });
+    Admin.saveCourses(courses);
+    Admin.log('导入', 'B站课程库', `批量导入 ${valid.length} 门课程`);
+    UI.close(importModal);
+    UI.toast(`已导入 ${valid.length} 门课程`, 'success');
+    parsed = null;
+    render();
+  };
+
+  fillFilters();
+  render();
+})();
+</script>
+<style>
+  .subject-chip { display: inline-flex; padding: 2px 8px; border-radius: 6px; background: #f5f6fa; font-size: 12px; color: var(--text-2); }
+  .cover-preview { height: 116px; border-radius: 10px; background: linear-gradient(135deg,#6366f1,#a855f7); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.9); font-size: 12px; letter-spacing: .08em; border: 1px solid var(--line); }
+  .import-tip { font-size: 12.5px; background: #f8f9fc; border: 1px solid var(--line); border-radius: 9px; padding: 10px 13px; line-height: 1.7; }
+  .parse-summary { display: flex; gap: 8px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .parse-list { max-height: 260px; overflow: auto; }
+  .import-row:last-child { border-bottom: 0; }
+</style>
+</body>
+</html>

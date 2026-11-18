@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>错题本 · 云枢智学</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/portal.css">
+</head>
+<body>
+
+<div id="siteHeader"></div>
+
+<section class="page-hero">
+  <div class="container-wide">
+    <div class="row-between wrap gap-16">
+      <div>
+        <h1>我的错题本</h1>
+        <p class="desc">所有答错的题目自动归档，按错误频次分级。连续答对 3 次即自动标记为已掌握。</p>
+      </div>
+      <button class="btn btn-primary" id="startRedoTop">开始复习错题 <span style="opacity:.7">→</span></button>
+    </div>
+  </div>
+</section>
+
+<div class="page-body" id="browseView">
+  <div class="container-wide">
+    <!-- 统计 -->
+    <div class="mistake-stats mb-16" id="mStats"></div>
+
+    <!-- 高频错题 -->
+    <div class="top3-card mb-16" id="top3Card"></div>
+
+    <!-- 筛选 -->
+    <div class="qc-toolbar" style="margin-bottom:14px">
+      <div class="seg" id="statusSeg">
+        <button class="active" data-status="all">全部</button>
+        <button data-status="pending">待复习</button>
+        <button data-status="mastered">已掌握</button>
+      </div>
+      <select class="select" id="subjectFilter">
+        <option value="all">全部分类</option>
+      </select>
+      <select class="select" id="timeFilter">
+        <option value="all">全部时间</option>
+        <option value="7">近 7 天</option>
+        <option value="30">近 30 天</option>
+      </select>
+      <select class="select" id="sortFilter">
+        <option value="recent">按最近答错时间</option>
+        <option value="count">按错误次数</option>
+      </select>
+      <span class="small muted" style="margin-left:auto" id="listCount"></span>
+    </div>
+
+    <div id="mistakeList"></div>
+  </div>
+</div>
+
+<!-- 重做模式 -->
+<div class="page-body" id="redoView" style="display:none">
+  <div class="container-wide">
+    <div class="card" style="overflow:hidden">
+      <div class="row-between" style="padding:16px 22px;border-bottom:1px solid var(--line);background:#fafbfc">
+        <div class="row gap-12">
+          <button class="btn btn-ghost btn-sm" id="exitRedo">‹ 退出练习</button>
+          <div>
+            <div style="font-size:14px;font-weight:700">错题重做</div>
+            <div class="small muted" id="redoSub"></div>
+          </div>
+        </div>
+        <div class="row gap-12">
+          <span class="small muted" id="redoProgressText"></span>
+          <div class="progress" style="width:160px"><i id="redoProgressBar" style="width:0%"></i></div>
+        </div>
+      </div>
+      <div style="padding:26px 28px 10px" id="redoBody"></div>
+      <div class="row-between" style="padding:16px 22px;border-top:1px solid var(--line)">
+        <button class="btn btn-outline" id="redoPrev">‹ 上一题</button>
+        <div class="row gap-8">
+          <button class="btn btn-primary" id="redoSubmit">提交答案</button>
+          <button class="btn btn-outline" id="redoNext" style="display:none">下一题 →</button>
+        </div>
+      </div>
+    </div>
+    <div class="center mt-16"><button class="btn btn-ghost btn-sm" id="exitRedo2">退出重做，返回错题浏览</button></div>
+  </div>
+</div>
+
+<div id="siteFooter"></div>
+
+<!-- 批量操作栏 -->
+<div class="batch-bar" id="batchBar">
+  <span class="bb-count">已选择 <b id="batchCount">0</b> 项</span>
+  <span style="width:1px;height:18px;background:rgba(255,255,255,.2)"></span>
+  <button class="btn btn-sm" id="batchMaster">批量标记已掌握</button>
+  <button class="btn btn-sm danger" id="batchRemove">批量移除</button>
+  <button class="btn btn-sm" id="batchCancel">取消选择</button>
+  <button class="bb-close" id="batchClose">✕</button>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script>
+(function () {
+  if (!UI.requireUser()) return;
+  UI.renderHeader('questions');
+  UI.renderFooter();
+  UI.bindModals();
+
+  const KEY = 'mistakes';
+  let mistakes = UI.Store.get(KEY, null);
+  if (!mistakes) { mistakes = JSON.parse(JSON.stringify(DB.SEED_MISTAKES)); UI.Store.set(KEY, mistakes); }
+  let selected = new Set();
+  const state = { status: 'all', subject: 'all', time: 'all', sort: 'recent' };
+
+  const qOf = m => DB.QUESTION_MAP[m.questionId];
+  const today = new Date('2026-11-05T12:00:00');
+
+  function save() { UI.Store.set(KEY, mistakes); }
+  function answerText(q, val) {
+    if (val == null || val === '') return '未作答';
+    if (q.type === 'short') return typeof val === 'string' ? val : '未作答';
+    if (q.type === 'judge') return val === 'A' ? '正确' : val === 'B' ? '错误' : '未作答';
+    return Array.isArray(val) ? val.join('') : val;
+  }
+  function correctText(q) {
+    if (q.type === 'judge') return q.answer === 'A' ? '正确' : '错误';
+    if (q.type === 'short') return q.reference || '参考解析';
+    return Array.isArray(q.answer) ? q.answer.join('') : q.answer;
+  }
+  function daysAgo(dateStr) { return Math.floor((today - new Date(dateStr + 'T12:00:00')) / 86400000); }
+  function levelOf(m) {
+    if (m.count >= 3) return { label: '高频易错', cls: 'badge-danger', icon: '🔥' };
+    if (m.count === 2) return { label: '多次错误', cls: 'badge-warn', icon: '⚡' };
+    return { label: '偶尔错误', cls: 'badge-gray', icon: '·' };
+  }
+
+  /* ---------------- 渲染统计 ---------------- */
+  function renderStats() {
+    const total = mistakes.length;
+    const mastered = mistakes.filter(m => m.mastered).length;
+    const pending = total - mastered;
+    const rate = total ? Math.round(mastered / total * 100) : 0;
+    document.getElementById('mStats').innerHTML = `
+      <div class="mstat"><span class="ms-icon" style="background:#fef3f2;color:#f04438">📕</span><div><div class="ms-n">${total}</div><div class="ms-l">错题总数</div></div></div>
+      <div class="mstat"><span class="ms-icon" style="background:#fffaeb;color:#f79009">🔁</span><div><div class="ms-n">${pending}</div><div class="ms-l">待复习</div></div></div>
+      <div class="mstat"><span class="ms-icon" style="background:#ecfdf3;color:#12b76a">✅</span><div><div class="ms-n">${mastered}</div><div class="ms-l">已掌握</div></div></div>
+      <div class="mstat"><span class="ms-icon" style="background:#eef2ff;color:#4f46e5">🎯</span><div><div class="ms-n">${rate}<span style="font-size:14px;color:var(--muted)">%</span></div><div class="ms-l">掌握率</div></div></div>`;
+  }
+
+  /* ---------------- 高频 Top3 ---------------- */
+  function renderTop3() {
+    const top = mistakes.filter(m => !m.mastered).sort((a, b) => b.count - a.count).slice(0, 3);
+    const card = document.getElementById('top3Card');
+    if (!top.length) {
+      card.innerHTML = `<div class="row gap-12"><span style="font-size:22px">🎉</span><div><div style="font-weight:700;font-size:13.5px">暂无待复习的高频错题</div><div class="small muted">继续保持，把所有错题都变成已掌握</div></div></div>`;
+      return;
+    }
+    card.innerHTML = `
+      <div class="row-between mb-8">
+        <div class="row gap-8"><span style="font-size:17px">🔥</span><b style="font-size:13.5px">高频错题 Top 3</b><span class="badge badge-warn">错误次数最多</span></div>
+        <span class="small muted">点击题目直接重做</span>
+      </div>
+      <div style="display:grid;gap:2px">
+        ${top.map((m, i) => {
+          const q = qOf(m);
+          return `<div class="top3-item" data-top="${m.questionId}">
+            <span class="rank">${i + 1}</span>
+            <span class="t3-text">${UI.esc(q.stem)}</span>
+            <span class="badge badge-danger" style="background:#fff">错 ${m.count} 次</span>
+            <span style="color:var(--muted-2)">›</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    card.querySelectorAll('[data-top]').forEach(el => el.addEventListener('click', () => {
+      startRedo([el.dataset.top]);
+    }));
+  }
+
+  /* ---------------- 筛选 ---------------- */
+  function currentList() {
+    let list = mistakes.slice();
+    if (state.status === 'pending') list = list.filter(m => !m.mastered);
+    if (state.status === 'mastered') list = list.filter(m => m.mastered);
+    if (state.subject !== 'all') list = list.filter(m => qOf(m).subjectId === state.subject);
+    if (state.time !== 'all') list = list.filter(m => daysAgo(m.date) <= +state.time);
+    list.sort((a, b) => state.sort === 'count' ? b.count - a.count : new Date(b.date) - new Date(a.date));
+    return list;
+  }
+
+  function subjectOptions() {
+    const ids = [...new Set(mistakes.map(m => qOf(m).subjectId))];
+    const sel = document.getElementById('subjectFilter');
+    sel.innerHTML = '<option value="all">全部分类</option>' + ids.map(id => {
+      const s = DB.SUBJECT_MAP[id];
+      return `<option value="${id}">${s.name}</option>`;
+    }).join('');
+  }
+
+  /* ---------------- 错题列表 ---------------- */
+  function renderList() {
+    const list = currentList();
+    document.getElementById('listCount').textContent = `共 ${list.length} 道错题`;
+    const wrap = document.getElementById('mistakeList');
+    if (!list.length) {
+      wrap.innerHTML = `<div class="empty"><div class="em-icon">🗂</div><div class="em-title">${mistakes.length ? '当前筛选下暂无错题' : '暂无错题'}</div><div class="em-sub">${mistakes.length ? '试试调整状态、分类或时间筛选' : '去题库练习，答错的题目会自动收进这里'}</div><a class="btn btn-soft btn-sm mt-16" href="questions.html">去题库练习</a></div>`;
+      return;
+    }
+    wrap.innerHTML = list.map(m => {
+      const q = qOf(m);
+      const lv = levelOf(m);
+      const dots = Array.from({ length: 3 }, (_, i) => `<i class="${i < m.corrected ? 'on' : ''}"></i>`).join('');
+      return `
+        <div class="mistake-card ${m.mastered ? 'mastered' : ''}" data-id="${m.questionId}">
+          <div class="mc-top">
+            <label class="checkbox" style="margin-right:2px"><input type="checkbox" data-check="${m.questionId}" ${selected.has(m.questionId) ? 'checked' : ''} ${m.mastered ? 'disabled' : ''}></label>
+            <span class="badge ${lv.cls}">${lv.icon} ${lv.label} · 错 ${m.count} 次</span>
+            <span class="badge badge-outline">${UI.typeName(q.type)}</span>
+            ${m.mastered ? '<span class="badge badge-success">已掌握</span>' : ''}
+            <span class="correction" style="margin-left:auto">纠正进度 ${Math.min(m.corrected, 3)}/3 <span class="c-dots">${dots}</span></span>
+          </div>
+          <div class="mc-stem">${UI.esc(q.stem)}</div>
+          <div class="mc-answers">
+            <div class="mc-ans you"><b>你的答案：</b>${UI.esc(answerText(q, m.wrongAnswer))}</div>
+            <div class="mc-ans right"><b>正确答案：</b>${UI.esc(correctText(q))}</div>
+          </div>
+          <div class="mc-meta">
+            <span>📂 ${UI.esc(q.subjectName)} / ${UI.esc(q.stageName)}</span>
+            <span>🕒 最近答错 ${m.date}</span>
+            <span>🔁 错误 ${m.count} 次</span>
+          </div>
+          <div class="mc-foot">
+            <button class="btn btn-soft btn-sm" data-action="redo">重新做题</button>
+            ${m.mastered ? '' : `<button class="btn btn-outline btn-sm" data-action="master">标记已掌握</button>`}
+            <button class="btn btn-ghost btn-sm" data-action="remove" style="color:var(--danger)">移除错题</button>
+            <span class="small muted" style="margin-left:auto">${m.mastered ? '已掌握，不再出现在待复习列表' : '答对 1 次纠正进度 +1，累计 3 次自动掌握'}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('[data-check]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) selected.add(cb.dataset.check); else selected.delete(cb.dataset.check);
+        renderBatchBar();
+      });
+    });
+    wrap.querySelectorAll('[data-action]').forEach(btn => {
+      const card = btn.closest('.mistake-card');
+      const id = card.dataset.id;
+      btn.addEventListener('click', () => handleAction(btn.dataset.action, id));
+    });
+  }
+
+  function handleAction(action, id) {
+    const m = mistakes.find(x => x.questionId === id);
+    if (!m) return;
+    if (action === 'redo') { startRedo([id]); return; }
+    if (action === 'master') {
+      UI.confirm({ title: '标记为已掌握', message: '标记后该错题将置灰，并从待复习列表中移除。确定已掌握这道题吗？', confirmText: '标记已掌握', icon: '✓' })
+        .then(ok => {
+          if (!ok) return;
+          m.mastered = true; m.corrected = 3; save(); renderAll();
+          UI.toast('已标记为掌握', 'success');
+        });
+    }
+    if (action === 'remove') {
+      UI.confirm({ title: '移除错题', message: '移除后该题将不再出现在错题本中（不会删除题目本身）。确定移除吗？', confirmText: '移除', danger: true, icon: '🗑' })
+        .then(ok => {
+          if (!ok) return;
+          mistakes = mistakes.filter(x => x.questionId !== id);
+          selected.delete(id); save(); renderAll();
+          UI.toast('已移除该错题', 'success');
+        });
+    }
+  }
+
+  /* ---------------- 批量 ---------------- */
+  function renderBatchBar() {
+    const bar = document.getElementById('batchBar');
+    bar.classList.toggle('show', selected.size > 0);
+    document.getElementById('batchCount').textContent = selected.size;
+  }
+  function clearSelection() {
+    selected.clear(); renderAll();
+  }
+  document.getElementById('batchCancel').onclick = clearSelection;
+  document.getElementById('batchClose').onclick = clearSelection;
+  document.getElementById('batchMaster').onclick = () => {
+    if (!selected.size) return;
+    UI.confirm({ title: '批量标记已掌握', message: `确定将已选择的 ${selected.size} 道错题标记为已掌握吗？`, confirmText: '确认标记', icon: '✓' })
+      .then(ok => {
+        if (!ok) return;
+        mistakes.forEach(m => { if (selected.has(m.questionId)) { m.mastered = true; m.corrected = 3; } });
+        selected.clear(); save(); renderAll(); renderBatchBar();
+        UI.toast('已批量标记为掌握', 'success');
+      });
+  };
+  document.getElementById('batchRemove').onclick = () => {
+    if (!selected.size) return;
+    UI.confirm({ title: '批量移除错题', message: `确定移除已选择的 ${selected.size} 道错题吗？移除后不可恢复。`, confirmText: '确认移除', danger: true, icon: '🗑' })
+      .then(ok => {
+        if (!ok) return;
+        mistakes = mistakes.filter(m => !selected.has(m.questionId));
+        selected.clear(); save(); renderAll(); renderBatchBar();
+        UI.toast('已批量移除', 'success');
+      });
+  };
+
+  /* ---------------- 重做模式 ---------------- */
+  let redo = null;
+  function startRedo(ids) {
+    const pending = mistakes.filter(m => !m.mastered).map(m => m.questionId);
+    let queue = ids && ids.length ? ids.slice() : pending;
+    if (!queue.length) {
+      UI.toast('没有待复习的错题', 'warn');
+      return;
+    }
+    redo = { ids: queue, index: 0, answers: {}, results: {} };
+    document.getElementById('browseView').style.display = 'none';
+    document.getElementById('redoView').style.display = '';
+    renderRedo();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function exitRedo() {
+    redo = null;
+    document.getElementById('redoView').style.display = 'none';
+    document.getElementById('browseView').style.display = '';
+    renderAll();
+  }
+  document.getElementById('exitRedo').onclick = exitRedo;
+  document.getElementById('exitRedo2').onclick = exitRedo;
+  document.getElementById('startRedoTop').onclick = () => startRedo(null);
+
+  function renderRedo() {
+    if (!redo) return;
+    const id = redo.ids[redo.index];
+    const m = mistakes.find(x => x.questionId === id);
+    const q = DB.QUESTION_MAP[id];
+    const result = redo.results[id];
+    const answer = redo.answers[id];
+    document.getElementById('redoSub').textContent = `${q.subjectName} / ${q.stageName}`;
+    document.getElementById('redoProgressText').textContent = `第 ${redo.index + 1} / ${redo.ids.length} 题`;
+    document.getElementById('redoProgressBar').style.width = ((redo.index + 1) / redo.ids.length * 100) + '%';
+    document.getElementById('redoPrev').disabled = redo.index === 0;
+
+    const hasOptions = q.options && q.options.length > 0 && q.type !== 'short';
+    let body = `
+      <div class="row gap-8 mb-12">
+        <span class="badge badge-brand">${UI.typeName(q.type)}</span>
+        <span class="diff diff-${q.difficulty}">● ${UI.diffName(q.difficulty)}</span>
+        <span class="badge badge-outline">已错 ${m.count} 次</span>
+        <span class="badge ${m.corrected >= 3 ? 'badge-success' : 'badge-warn'}">纠正 ${Math.min(m.corrected, 3)}/3</span>
+      </div>
+      <div style="font-size:16px;font-weight:650;line-height:1.7;margin-bottom:18px">${UI.esc(q.stem)}</div>`;
+
+    if (hasOptions) {
+      body += `<div class="opt-list">${q.options.map(o => {
+        let cls = 'opt';
+        const picked = Array.isArray(answer) ? answer.includes(o.key) : answer === o.key;
+        if (result) {
+          cls += ' disabled';
+          const correctKeys = q.type === 'multiple' ? q.answer : [q.answer];
+          if (correctKeys.includes(o.key)) cls += ' correct';
+          else if (picked) cls += ' wrong';
+        } else if (picked) cls += ' selected';
+        return `<div class="${cls}" data-ropt="${o.key}"><span class="key">${o.key}</span><span class="otext">${UI.esc(o.text)}</span></div>`;
+      }).join('')}</div>`;
+    } else {
+      body += `<div style="padding:16px 18px;border-radius:12px;background:var(--warn-soft);border:1px solid #fedf89;font-size:13px;color:#93370d">
+        ⚠ 此题暂无可选的答题选项，请自行复习。正确答案：<b>${UI.esc(correctText(q))}</b>
+      </div>`;
+    }
+
+    if (result) {
+      body += `
+        <div class="analysis-card mt-16">
+          <div class="ac-head">${result.correct ? '<span style="color:var(--success)">✓</span> 回答正确' : '<span style="color:var(--danger)">✕</span> 回答错误'}
+            ${result.correct ? `<span class="badge badge-success" style="margin-left:auto">纠正进度 ${Math.min(m.corrected, 3)}/3</span>` : `<span class="badge badge-danger" style="margin-left:auto">建议再复习一遍</span>`}
+          </div>
+          <div class="ac-body">
+            <div class="answer-line"><span class="al-label">正确答案</span><b style="color:var(--success)">${UI.esc(correctText(q))}</b></div>
+            <div class="analysis-text">${UI.esc(q.analysis)}</div>
+            ${m.mastered ? '<div class="mt-8 badge badge-success">已累计答对 3 次，已自动标记为已掌握</div>' : ''}
+          </div>
+        </div>`;
+    }
+
+    document.getElementById('redoBody').innerHTML = body;
+    document.getElementById('redoSubmit').style.display = result || !hasOptions ? 'none' : '';
+    document.getElementById('redoNext').style.display = result || !hasOptions ? '' : 'none';
+    document.getElementById('redoNext').textContent = redo.index === redo.ids.length - 1 ? '完成重做' : '下一题 →';
+
+    document.querySelectorAll('[data-ropt]').forEach(el => el.onclick = () => {
+      if (redo.results[id]) return;
+      const k = el.dataset.ropt;
+      if (q.type === 'multiple') {
+        let arr = Array.isArray(redo.answers[id]) ? redo.answers[id].slice() : [];
+        arr.includes(k) ? arr = arr.filter(x => x !== k) : arr.push(k);
+        redo.answers[id] = arr.sort();
+      } else {
+        redo.answers[id] = k;
+      }
+      renderRedo();
+    });
+    if (result || !hasOptions) {
+      if (!result) {
+        // 无选项题：直接进入下一题逻辑
+        document.getElementById('redoNext').onclick = nextRedo;
+      }
+    }
+  }
+
+  document.getElementById('redoSubmit').onclick = () => {
+    if (!redo) return;
+    const id = redo.ids[redo.index];
+    const m = mistakes.find(x => x.questionId === id);
+    const q = DB.QUESTION_MAP[id];
+    const ans = redo.answers[id];
+    if (!ans || (Array.isArray(ans) && !ans.length)) { UI.toast('请先选择答案', 'warn'); return; }
+    const correctKeys = q.type === 'multiple' ? q.answer : [q.answer];
+    const picked = q.type === 'multiple' ? ans : [ans];
+    const correct = correctKeys.length === picked.length && correctKeys.every(k => picked.includes(k));
+    redo.results[id] = { correct };
+    if (correct) {
+      m.corrected = Math.min(3, m.corrected + 1);
+      if (m.corrected >= 3) m.mastered = true;
+      UI.toast(m.mastered ? '答对了！已累计 3 次，自动标记为已掌握' : `答对了！纠正进度 ${m.corrected}/3`, 'success');
+    } else {
+      m.count++;
+      m.date = '2026-11-05';
+      UI.toast('回答错误，建议结合解析再复习', 'error');
+    }
+    save();
+    document.getElementById('redoNext').onclick = nextRedo;
+    renderRedo();
+  };
+  document.getElementById('redoNext').onclick = nextRedo;
+
+  function nextRedo() {
+    if (!redo) return;
+    if (redo.index >= redo.ids.length - 1) { exitRedo(); UI.toast('本轮错题重做已完成', 'success'); return; }
+    redo.index++;
+    renderRedo();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  document.getElementById('redoPrev').onclick = () => {
+    if (!redo || redo.index === 0) return;
+    redo.index--; renderRedo();
+  };
+
+  /* ---------------- 事件 ---------------- */
+  document.getElementById('statusSeg').addEventListener('click', e => {
+    const b = e.target.closest('button[data-status]'); if (!b) return;
+    document.querySelectorAll('#statusSeg button').forEach(x => x.classList.toggle('active', x === b));
+    state.status = b.dataset.status; renderList();
+  });
+  document.getElementById('subjectFilter').onchange = e => { state.subject = e.target.value; renderList(); };
+  document.getElementById('timeFilter').onchange = e => { state.time = e.target.value; renderList(); };
+  document.getElementById('sortFilter').onchange = e => { state.sort = e.target.value; renderList(); };
+
+  function renderAll() {
+    renderStats(); renderTop3(); subjectOptions(); renderList(); renderBatchBar();
+    document.getElementById('subjectFilter').value = state.subject;
+  }
+  renderAll();
+})();
+</script>
+</body>
+</html>

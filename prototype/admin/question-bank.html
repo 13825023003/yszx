@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>题库管理 · 云枢智学管理端</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+  <div id="adminAsideMount"></div>
+  <div class="admin-main">
+    <div id="adminTopbarMount"></div>
+    <main class="admin-content">
+
+      <div class="page-head">
+        <div>
+          <h1>题库管理</h1>
+          <div class="desc">全学科刷题题库，新增题目需经过审核后上架</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-outline btn-sm" id="importBtn" data-perm="import">⇪ 导入 Excel</button>
+          <button class="btn btn-outline btn-sm" id="exportBtn" data-perm="export">⇩ 导出 Excel</button>
+          <button class="btn btn-primary btn-sm" id="addQuestionBtn" data-perm="create">+ 新增题目</button>
+        </div>
+      </div>
+
+      <div class="qb-stats" id="qbStats"></div>
+
+      <div class="a-card">
+        <div class="a-toolbar">
+          <div class="search"><i>🔍</i><input class="input" id="kw" placeholder="搜索题目关键词" /></div>
+          <select class="select" id="stageFilter"><option value="">全部阶段</option></select>
+          <select class="select" id="typeFilter">
+            <option value="">全部类型</option>
+            <option value="single">单选</option><option value="multiple">多选</option>
+            <option value="judge">判断</option><option value="short">简答</option>
+          </select>
+          <select class="select" id="diffFilter">
+            <option value="">全部难度</option><option value="easy">简单</option>
+            <option value="medium">中等</option><option value="hard">困难</option>
+          </select>
+          <select class="select" id="statusFilter">
+            <option value="">全部状态</option>
+            <option value="published">已上架</option><option value="offline">已下架</option>
+            <option value="pending">待审核</option><option value="draft">草稿</option><option value="rejected">已驳回</option>
+          </select>
+          <div class="spacer"></div>
+          <span class="small muted" id="resultHint"></span>
+        </div>
+
+        <div class="a-batchbar" id="batchBar">
+          <span>已选择 <span class="count" id="selectedCount">0</span> 道题目</span>
+          <div class="spacer"></div>
+          <button class="btn btn-success-soft btn-xs" data-batch="publish" data-perm="edit">批量上架</button>
+          <button class="btn btn-outline btn-xs" data-batch="offline" data-perm="edit">批量下架</button>
+          <button class="btn btn-danger-soft btn-xs" data-batch="delete" data-perm="delete">批量删除</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="check-col"><input type="checkbox" id="checkAll" /></th>
+                <th style="width:84px">ID</th>
+                <th>题目</th>
+                <th style="width:170px">阶段</th>
+                <th style="width:76px">类型</th>
+                <th style="width:88px">难度</th>
+                <th style="width:82px">状态</th>
+                <th style="width:132px">创建时间</th>
+                <th style="width:160px">操作</th>
+              </tr>
+            </thead>
+            <tbody id="qbBody"></tbody>
+          </table>
+        </div>
+        <div id="qbEmpty" style="display:none"></div>
+        <div class="a-card-body" style="padding:12px 20px 16px">
+          <div class="pager" id="qbPager"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- 新增 / 编辑题目 -->
+<div class="modal-mask" id="qModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div>
+        <h3 id="qModalTitle">新增题目</h3>
+        <div class="sub" id="qModalSub">新增题目将进入「待审核」状态</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body" style="max-height:64vh;overflow-y:auto">
+      <div class="form-grid">
+        <div class="field" id="f-qStem">
+          <label class="req">题目内容</label>
+          <textarea class="textarea" id="qStem" rows="3" placeholder="请输入题干内容"></textarea>
+          <div class="err-text">请输入题目内容</div>
+        </div>
+        <div class="form-grid cols-2">
+          <div class="field" id="f-qStage">
+            <label class="req">所属阶段</label>
+            <select class="select" id="qStage"><option value="">请选择阶段</option></select>
+            <div class="err-text">请选择所属阶段</div>
+          </div>
+          <div class="field" id="f-qType">
+            <label class="req">题目类型</label>
+            <select class="select" id="qType">
+              <option value="">请选择类型</option>
+              <option value="single">单选</option><option value="multiple">多选</option>
+              <option value="judge">判断</option><option value="short">简答</option>
+            </select>
+            <div class="err-text">请选择题目类型</div>
+          </div>
+        </div>
+        <div class="form-grid cols-2">
+          <div class="field" id="f-qDiff">
+            <label class="req">难度</label>
+            <select class="select" id="qDiff">
+              <option value="">请选择难度</option>
+              <option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option>
+            </select>
+            <div class="err-text">请选择难度</div>
+          </div>
+          <div class="field">
+            <label>状态</label>
+            <div style="height:40px;display:flex;align-items:center" id="qStatusView"><span class="badge badge-warn">待审核</span></div>
+          </div>
+        </div>
+
+        <div class="field" id="f-qOptions">
+          <label class="req">选项与正确答案</label>
+          <div id="optionWrap"></div>
+          <div class="err-text">请至少填写 2 个选项，并勾选正确答案</div>
+        </div>
+
+        <div class="field">
+          <label>标签</label>
+          <input class="input" id="qTags" placeholder="多个标签用逗号分隔，如 RAG, 检索优化" />
+        </div>
+        <div class="field">
+          <label>解析</label>
+          <textarea class="textarea" id="qAnalysis" rows="3" placeholder="答案解析，将展示给学员"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="qSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 题目详情 -->
+<div class="modal-mask" id="detailModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div>
+        <h3>题目详情 <span class="small muted" id="detailId"></span></h3>
+        <div class="sub" id="detailMeta"></div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body" style="max-height:66vh;overflow-y:auto" id="detailBody"></div>
+    <div class="modal-foot" id="detailFoot"></div>
+  </div>
+</div>
+
+<!-- 导入 Excel -->
+<div class="modal-mask" id="importModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div>
+        <h3>导入题目</h3>
+        <div class="sub">支持 .xlsx / .xls，单次最多 500 道，导入后统一进入待审核状态</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="dropzone" id="dropzone">
+        <div class="dz-icon">📥</div>
+        <b>点击选择文件，或将 Excel 拖拽到此处</b>
+        <span>支持 .xlsx / .xls，文件不超过 10MB</span>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
+      </div>
+      <div class="row-between mt-12">
+        <div class="small muted" id="fileInfo">未选择文件</div>
+        <button class="link small" id="tplBtn" type="button">下载导入模板</button>
+      </div>
+      <div id="importPreview" style="margin-top:14px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="confirmImport" disabled>确认导入</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script>
+(function () {
+  if (!Admin.renderShell('question-bank')) return;
+  UI.bindModals();
+
+  let questions = Admin.copy(Admin.getQuestions());
+  let subjects = Admin.getSubjects();
+  let routes = Admin.getRoutes();
+  const params = new URLSearchParams(location.search);
+  let filters = {
+    kw: '', stage: '', type: '', diff: '', status: params.get('status') || ''
+  };
+  let page = 1;
+  const pageSize = 10;
+  const selected = new Set();
+  let editId = null;
+  let currentType = '';
+  let importFile = null;
+  let importRows = null;
+
+  const typeOptions = [['single', '单选'], ['multiple', '多选'], ['judge', '判断'], ['short', '简答']];
+  const stageOptions = [];
+  subjects.forEach(s => s.stages.forEach(st => stageOptions.push({
+    id: st.id, name: st.name, subjectId: s.id, subjectName: s.name, disabled: st.enabled === false
+  })));
+
+  /* ---------- 统计 ---------- */
+  function renderStats() {
+    const count = fn => questions.filter(fn).length;
+    const cards = [
+      ['题目总数', questions.length, '📝'],
+      ['已上架', count(q => q.status === 'published'), '✅'],
+      ['待审核', count(q => q.status === 'pending'), '⏳'],
+      ['单选题', count(q => q.type === 'single'), '①'],
+      ['多选题', count(q => q.type === 'multiple'), '☑'],
+      ['判断题', count(q => q.type === 'judge'), '⚖'],
+      ['简答题', count(q => q.type === 'short'), '✍']
+    ];
+    document.getElementById('qbStats').innerHTML = cards.map(c => `
+      <div class="qb-stat"><span class="qbs-label">${c[1] === undefined ? '' : ''}${c[0]}</span>
+        <span class="qbs-num">${c[1]}</span><span class="qbs-icon">${c[2]}</span></div>`).join('');
+  }
+
+  /* ---------- 选项 ---------- */
+  function fillStageFilter() {
+    const groups = {};
+    stageOptions.forEach(st => { (groups[st.subjectName] = groups[st.subjectName] || []).push(st); });
+    document.getElementById('stageFilter').innerHTML = '<option value="">全部阶段</option>' +
+      Object.keys(groups).map(g => `<optgroup label="${UI.esc(g)}">` +
+        groups[g].map(st => `<option value="${st.id}">${UI.esc(st.name)}</option>`).join('') + '</optgroup>').join('');
+    document.getElementById('qStage').innerHTML = '<option value="">请选择阶段</option>' +
+      Object.keys(groups).map(g => `<optgroup label="${UI.esc(g)}">` +
+        groups[g].map(st => `<option value="${st.id}">${UI.esc(st.name)}${st.disabled ? '（已禁用）' : ''}</option>`).join('') + '</optgroup>').join('');
+  }
+
+  function renderOptions(type, options, answer, refAnswer) {
+    currentType = type;
+    const wrap = document.getElementById('optionWrap');
+    const field = document.getElementById('f-qOptions');
+    field.classList.remove('invalid');
+    if (!type) { wrap.innerHTML = '<div class="opt-placeholder">请先选择题目类型</div>'; return; }
+    if (type === 'short') {
+      wrap.innerHTML = `<div class="field" style="margin-top:2px">
+        <label>参考答案（选填）</label>
+        <textarea class="textarea" id="shortRef" rows="2" placeholder="简答题参考答案，用于 AI 评分参考">${UI.esc(refAnswer || '')}</textarea>
+      </div>`;
+      field.querySelector('label').textContent = '参考答案与解析';
+      field.querySelector('.err-text').style.display = 'none';
+      return;
+    }
+    field.querySelector('label').textContent = '选项与正确答案';
+    field.querySelector('.err-text').style.display = '';
+    if (type === 'judge') {
+      const cur = answer || '';
+      wrap.innerHTML = `<div class="judge-choices">
+        <label class="judge-choice ${cur === 'A' ? 'active' : ''}"><input type="radio" name="judge" value="A" ${cur === 'A' ? 'checked' : ''}> <b>A</b> 正确</label>
+        <label class="judge-choice ${cur === 'B' ? 'active' : ''}"><input type="radio" name="judge" value="B" ${cur === 'B' ? 'checked' : ''}> <b>B</b> 错误</label>
+      </div>`;
+      wrap.querySelectorAll('input[name=judge]').forEach(r => r.addEventListener('change', () => {
+        wrap.querySelectorAll('.judge-choice').forEach(x => x.classList.toggle('active', x.querySelector('input').checked));
+        field.classList.remove('invalid');
+      }));
+      return;
+    }
+    const opts = (options && options.length ? options : [
+      { key: 'A', text: '' }, { key: 'B', text: '' }, { key: 'C', text: '' }, { key: 'D', text: '' }
+    ]);
+    wrap.innerHTML = `<div class="opt-list">${opts.map(o => optRowHtml(o.key, o.text, (answer || '').includes(o.key), type)).join('')}</div>
+      <button class="btn btn-outline btn-xs mt-8" type="button" id="addOptBtn">+ 添加选项</button>`;
+    bindOptionEvents();
+  }
+
+  function optRowHtml(key, text, checked, type) {
+    return `<div class="opt-row" data-key="${key}">
+      <span class="opt-key">${key}</span>
+      <input class="input opt-text" value="${UI.esc(text)}" placeholder="选项 ${key} 内容" />
+      <label class="checkbox opt-correct"><input type="${type === 'single' ? 'radio' : 'checkbox'}" name="correctOpt" value="${key}" ${checked ? 'checked' : ''}> 正确</label>
+      <button class="btn btn-ghost btn-xs opt-del" type="button" title="删除选项">✕</button>
+    </div>`;
+  }
+
+  function bindOptionEvents() {
+    const wrap = document.getElementById('optionWrap');
+    const add = document.getElementById('addOptBtn');
+    add && (add.onclick = () => {
+      const rows = wrap.querySelectorAll('.opt-row');
+      if (rows.length >= 8) { UI.toast('最多支持 8 个选项', 'warn'); return; }
+      const key = String.fromCharCode(65 + rows.length);
+      wrap.querySelector('.opt-list').insertAdjacentHTML('beforeend', optRowHtml(key, '', false, currentType));
+      bindOptionEvents();
+    });
+    wrap.querySelectorAll('.opt-del').forEach(btn => btn.onclick = () => {
+      const rows = wrap.querySelectorAll('.opt-row');
+      if (rows.length <= 2) { UI.toast('至少保留 2 个选项', 'warn'); return; }
+      btn.closest('.opt-row').remove();
+      relabelOptions();
+    });
+    wrap.querySelectorAll('input[name=correctOpt]').forEach(inp => inp.addEventListener('change', () => {
+      if (currentType === 'single') {
+        wrap.querySelectorAll('input[name=correctOpt]').forEach(x => { if (x !== inp) x.checked = false; });
+      }
+      document.getElementById('f-qOptions').classList.remove('invalid');
+    }));
+  }
+
+  function relabelOptions() {
+    const wrap = document.getElementById('optionWrap');
+    wrap.querySelectorAll('.opt-row').forEach((row, i) => {
+      const key = String.fromCharCode(65 + i);
+      row.dataset.key = key;
+      row.querySelector('.opt-key').textContent = key;
+      row.querySelector('.opt-text').placeholder = '选项 ' + key + ' 内容';
+      const inp = row.querySelector('input[name=correctOpt]');
+      inp.value = key;
+    });
+  }
+
+  /* ---------- 表格 ---------- */
+  function filtered() {
+    return questions.filter(q => {
+      if (filters.kw && !q.stem.toLowerCase().includes(filters.kw.trim().toLowerCase())) return false;
+      if (filters.stage && q.stageId !== filters.stage) return false;
+      if (filters.type && q.type !== filters.type) return false;
+      if (filters.diff && q.difficulty !== filters.diff) return false;
+      if (filters.status && q.status !== filters.status) return false;
+      return true;
+    }).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  }
+
+  function rowActions(q) {
+    const acts = [];
+    if (q.status === 'pending') {
+      acts.push(`<button data-act="pass" data-id="${q.id}" data-perm="audit">通过</button>`);
+      acts.push(`<button class="danger" data-act="reject" data-id="${q.id}" data-perm="audit">不通过</button>`);
+    } else if (q.status === 'rejected') {
+      acts.push(`<button data-act="submit" data-id="${q.id}" data-perm="edit">重新提交</button>`);
+    } else if (q.status === 'published') {
+      acts.push(`<button data-act="offline" data-id="${q.id}" data-perm="edit">下架</button>`);
+    } else if (q.status === 'offline') {
+      acts.push(`<button data-act="submit" data-id="${q.id}" data-perm="edit">重新上架</button>`);
+    } else if (q.status === 'draft') {
+      acts.push(`<button data-act="submit" data-id="${q.id}" data-perm="edit">提交审核</button>`);
+    }
+    acts.push(`<button data-act="edit" data-id="${q.id}" data-perm="edit">编辑</button>`);
+    acts.push(`<button class="danger" data-act="delete" data-id="${q.id}" data-perm="delete">删除</button>`);
+    return acts.join('');
+  }
+
+  function render() {
+    renderStats();
+    const list = filtered();
+    const pages = Math.max(1, Math.ceil(list.length / pageSize));
+    if (page > pages) page = pages;
+    const pageList = list.slice((page - 1) * pageSize, page * pageSize);
+    document.getElementById('resultHint').textContent = `共 ${list.length} 道题目`;
+
+    const body = document.getElementById('qbBody');
+    const empty = document.getElementById('qbEmpty');
+    if (!list.length) {
+      body.innerHTML = '';
+      empty.style.display = '';
+      empty.innerHTML = `<div class="empty"><div class="em-icon">📝</div><div class="em-title">暂无匹配的题目</div><div class="em-sub">试试调整筛选条件</div></div>`;
+    } else {
+      empty.style.display = 'none';
+      body.innerHTML = pageList.map(q => `
+        <tr data-id="${q.id}">
+          <td><input type="checkbox" class="row-check" data-id="${q.id}" ${selected.has(q.id) ? 'checked' : ''}></td>
+          <td class="muted small">${q.id}</td>
+          <td style="max-width:430px">
+            <button class="stem-link ellipsis" data-act="detail" data-id="${q.id}" title="${UI.esc(q.stem)}">${UI.esc(q.stem)}</button>
+            <div class="small muted mt-8">${q.tags && q.tags.length ? q.tags.map(t => '#' + UI.esc(t)).join(' ') : '暂无标签'}</div>
+          </td>
+          <td class="small">${UI.esc(q.stageName)}</td>
+          <td>${Admin.typeBadge(q.type)}</td>
+          <td>${Admin.diffHtml(q.difficulty)}</td>
+          <td>${Admin.statusBadge(q.status)}</td>
+          <td class="small muted nowrap">${UI.esc(String(q.createdAt).slice(0, 16))}</td>
+          <td><div class="inline-actions">${rowActions(q)}</div></td>
+        </tr>`).join('');
+    }
+    renderPager(list.length, pages);
+    updateBatchBar();
+    Admin.applyPermissions();
+    const all = document.getElementById('checkAll');
+    if (all) all.checked = false;
+  }
+
+  function renderPager(total, pages) {
+    const pager = document.getElementById('qbPager');
+    if (!total) { pager.innerHTML = ''; return; }
+    let btns = `<button data-page="${page - 1}" ${page === 1 ? 'disabled' : ''}>‹</button>`;
+    for (let i = 1; i <= pages; i++) {
+      if (pages > 7 && i > 2 && i < pages - 1 && Math.abs(i - page) > 1) {
+        if (i === 3) btns += '<span style="padding:0 4px;color:var(--muted-2)">…</span>';
+        continue;
+      }
+      btns += `<button data-page="${i}" class="${i === page ? 'active' : ''}">${i}</button>`;
+    }
+    btns += `<button data-page="${page + 1}" ${page === pages ? 'disabled' : ''}>›</button>`;
+    pager.innerHTML = `<span class="small muted">第 ${page} / ${pages} 页 · 共 ${total} 条</span><div class="pages">${btns}</div>`;
+  }
+
+  /* ---------- 批量 ---------- */
+  function updateBatchBar() {
+    const bar = document.getElementById('batchBar');
+    bar.classList.toggle('show', selected.size > 0);
+    document.getElementById('selectedCount').textContent = selected.size;
+  }
+
+  function clearSelection() {
+    selected.clear();
+    document.querySelectorAll('.row-check').forEach(c => c.checked = false);
+    const all = document.getElementById('checkAll'); if (all) all.checked = false;
+    updateBatchBar();
+  }
+
+  /* ---------- 状态流转 ---------- */
+  async function doAction(q, act) {
+    if (act === 'detail') return openDetail(q.id);
+    if (act === 'edit') return openForm(q.id);
+    if (act === 'delete') {
+      const ok = await UI.confirm({ title: '删除题目', message: `确定删除题目「${q.stem.slice(0, 32)}…」吗？删除后不可恢复。`, confirmText: '确认删除', danger: true, icon: '🗑' });
+      if (!ok) return;
+      questions = questions.filter(x => x.id !== q.id);
+      selected.delete(q.id);
+      Admin.saveQuestions(questions);
+      Admin.log('删除', '题目 ' + q.id, q.stem.slice(0, 40));
+      UI.close('detailModal');
+      render();
+      UI.toast('题目已删除', 'success');
+      return;
+    }
+    let next, msg;
+    if (act === 'pass') { next = 'published'; msg = '审核通过，题目已上架'; }
+    if (act === 'reject') { next = 'rejected'; msg = '已驳回，题目退回修改'; }
+    if (act === 'offline') { next = 'offline'; msg = '题目已下架'; }
+    if (act === 'submit') { next = 'pending'; msg = q.status === 'offline' ? '已提交重新上架，等待审核' : '已重新提交，等待审核'; }
+    if (!next) return;
+    q.status = next;
+    Admin.saveQuestions(questions);
+    Admin.log(act === 'pass' ? '审核' : act === 'reject' ? '审核' : '编辑', '题目 ' + q.id, msg);
+    UI.close('detailModal');
+    render();
+    UI.toast(msg, 'success');
+  }
+
+  /* ---------- 详情 ---------- */
+  function openDetail(id) {
+    const q = questions.find(x => x.id === id); if (!q) return;
+    document.getElementById('detailId').textContent = q.id;
+    document.getElementById('detailMeta').innerHTML = `${Admin.statusBadge(q.status)} <span style="margin:0 6px">${Admin.typeBadge(q.type)}</span> ${Admin.diffHtml(q.difficulty)}`;
+    let optsHtml = '';
+    if (q.type === 'judge') {
+      optsHtml = `<div class="detail-opts">${['A', 'B'].map((k, i) => `<div class="do-item ${(q.answer || '').includes(k) ? 'right' : ''}"><b>${k}</b> ${i === 0 ? '正确' : '错误'}${(q.answer || '').includes(k) ? '<span class="badge badge-success">正确答案</span>' : ''}</div>`).join('')}</div>`;
+    } else if (q.options && q.options.length) {
+      optsHtml = `<div class="detail-opts">${q.options.map(o => `<div class="do-item ${(q.answer || '').includes(o.key) ? 'right' : ''}"><b>${o.key}</b><span>${UI.esc(o.text)}</span>${(q.answer || '').includes(o.key) ? '<span class="badge badge-success">正确答案</span>' : ''}</div>`).join('')}</div>`;
+    } else {
+      optsHtml = `<div class="detail-answer">简答题，无固定选项。${q.analysis ? '' : '暂无参考答案。'}</div>`;
+    }
+    document.getElementById('detailBody').innerHTML = `
+      <div class="detail-section">
+        <div class="ds-label">题干</div>
+        <div class="ds-stem">${UI.esc(q.stem)}</div>
+        <div class="row gap-6 wrap mt-12">${(q.tags || []).map(t => `<span class="tag">#${UI.esc(t)}</span>`).join('') || '<span class="small muted">暂无标签</span>'}</div>
+        <div class="detail-grid mt-16">
+          <div class="dg-i"><span class="k">所属学科</span><span class="v">${UI.esc(q.subjectName)}</span></div>
+          <div class="dg-i"><span class="k">所属阶段</span><span class="v">${UI.esc(q.stageName)}</span></div>
+          <div class="dg-i"><span class="k">创建时间</span><span class="v">${UI.esc(String(q.createdAt).slice(0, 16))}</span></div>
+          <div class="dg-i"><span class="k">题目 ID</span><span class="v">${q.id}</span></div>
+        </div>
+      </div>
+      <div class="detail-section">
+        <div class="ds-label">选项</div>
+        ${optsHtml}
+      </div>
+      <div class="detail-section">
+        <div class="ds-label">解析</div>
+        <div class="ds-text">${q.analysis ? UI.esc(q.analysis) : '暂无解析'}</div>
+      </div>
+      <div class="detail-section">
+        <div class="ds-label">答题统计</div>
+        <div class="stat-mini-grid">
+          <div><b>${Admin.formatNum(q.people)}</b><span>答题次数</span></div>
+          <div><b>${Admin.formatNum(q.correct)}</b><span>正确次数</span></div>
+          <div><b style="color:${q.accuracy >= 80 ? 'var(--success)' : q.accuracy >= 60 ? 'var(--warn)' : 'var(--danger)'}">${q.accuracy}%</b><span>正确率</span></div>
+        </div>
+      </div>`;
+    const acts = [];
+    if (q.status === 'pending') {
+      acts.push(`<button class="btn btn-danger-soft" data-detail-act="reject" data-perm="audit">审核不通过</button>`);
+      acts.push(`<button class="btn btn-primary" data-detail-act="pass" data-perm="audit">审核通过</button>`);
+    } else if (q.status === 'published') {
+      acts.push(`<button class="btn btn-outline" data-detail-act="offline" data-perm="edit">下架题目</button>`);
+    } else if (q.status === 'rejected' || q.status === 'draft' || q.status === 'offline') {
+      acts.push(`<button class="btn btn-primary" data-detail-act="submit" data-perm="edit">${q.status === 'offline' ? '重新上架' : q.status === 'draft' ? '提交审核' : '重新提交'}</button>`);
+    }
+    acts.push(`<button class="btn btn-outline" data-detail-act="edit" data-perm="edit">编辑</button>`);
+    acts.push(`<button class="btn btn-danger-soft" data-detail-act="delete" data-perm="delete">删除</button>`);
+    acts.push(`<button class="btn btn-ghost" data-close>关闭</button>`);
+    document.getElementById('detailFoot').innerHTML = acts.join('');
+    document.getElementById('detailFoot').querySelectorAll('[data-detail-act]').forEach(b => b.onclick = () => doAction(q, b.dataset.detailAct));
+    UI.open('detailModal');
+    Admin.applyPermissions(document.getElementById('detailModal'));
+  }
+
+  /* ---------- 表单 ---------- */
+  function openForm(id) {
+    editId = id || null;
+    const q = id ? questions.find(x => x.id === id) : null;
+    document.getElementById('qModalTitle').textContent = q ? '编辑题目' : '新增题目';
+    document.getElementById('qModalSub').textContent = q ? '修改后保持当前状态，如需重新上架请按状态流转操作' : '新增题目将进入「待审核」状态';
+    document.getElementById('qStem').value = q ? q.stem : '';
+    document.getElementById('qStage').value = q ? q.stageId : '';
+    document.getElementById('qType').value = q ? q.type : '';
+    document.getElementById('qDiff').value = q ? q.difficulty : '';
+    document.getElementById('qTags').value = q ? (q.tags || []).join(', ') : '';
+    document.getElementById('qAnalysis').value = q ? (q.analysis || '') : '';
+    document.getElementById('qStatusView').innerHTML = Admin.statusBadge(q ? q.status : 'pending');
+    ['f-qStem', 'f-qStage', 'f-qType', 'f-qDiff', 'f-qOptions'].forEach(f => document.getElementById(f).classList.remove('invalid'));
+    renderOptions(q ? q.type : '', q && q.options, q ? q.answer : '', '');
+    UI.open('qModal');
+    setTimeout(() => document.getElementById('qStem').focus(), 100);
+  }
+
+  document.getElementById('addQuestionBtn').onclick = () => openForm();
+  document.getElementById('qType').addEventListener('change', e => {
+    const t = e.target.value;
+    renderOptions(t, null, '', '');
+    document.getElementById('f-qType').classList.remove('invalid');
+  });
+  document.getElementById('qStem').addEventListener('input', () => document.getElementById('f-qStem').classList.remove('invalid'));
+  document.getElementById('qStage').addEventListener('change', () => document.getElementById('f-qStage').classList.remove('invalid'));
+  document.getElementById('qDiff').addEventListener('change', () => document.getElementById('f-qDiff').classList.remove('invalid'));
+
+  document.getElementById('qSave').onclick = () => {
+    const stem = document.getElementById('qStem').value.trim();
+    const stageId = document.getElementById('qStage').value;
+    const type = document.getElementById('qType').value;
+    const diff = document.getElementById('qDiff').value;
+    let ok = true;
+    document.getElementById('f-qStem').classList.toggle('invalid', !stem); ok = ok && !!stem;
+    document.getElementById('f-qStage').classList.toggle('invalid', !stageId); ok = ok && !!stageId;
+    document.getElementById('f-qType').classList.toggle('invalid', !type); ok = ok && !!type;
+    document.getElementById('f-qDiff').classList.toggle('invalid', !diff); ok = ok && !!diff;
+    if (!ok) { UI.toast('请完善必填项', 'error'); return; }
+
+    const st = stageOptions.find(x => x.id === stageId);
+    let options = [], answer = null, optionErr = false, analysis = document.getElementById('qAnalysis').value.trim();
+    if (type === 'single' || type === 'multiple') {
+      const rows = [...document.querySelectorAll('#optionWrap .opt-row')];
+      options = rows.map(r => ({ key: r.dataset.key, text: r.querySelector('.opt-text').value.trim() }));
+      const checked = rows.filter(r => r.querySelector('[name=correctOpt]').checked).map(r => r.dataset.key);
+      optionErr = options.length < 2 || options.some(o => !o.text) || checked.length === 0 || (type === 'single' && checked.length !== 1);
+      answer = checked.join('') || null;
+    } else if (type === 'judge') {
+      const sel = document.querySelector('#optionWrap input[name=judge]:checked');
+      optionErr = !sel;
+      answer = sel ? sel.value : null;
+      options = [{ key: 'A', text: '正确' }, { key: 'B', text: '错误' }];
+    } else if (type === 'short') {
+      const ref = document.getElementById('shortRef');
+      if (ref && ref.value.trim()) analysis = ref.value.trim() + (analysis ? '\n\n' + analysis : '');
+      if (!analysis) { optionErr = false; }
+    }
+    document.getElementById('f-qOptions').classList.toggle('invalid', optionErr);
+    if (optionErr) { UI.toast(type === 'single' ? '请补全选项并选择一个正确答案' : '请补全选项并至少选择一个正确答案', 'error'); return; }
+
+    const tags = document.getElementById('qTags').value.split(/[,，]/).map(x => x.trim()).filter(Boolean);
+    if (editId) {
+      const q = questions.find(x => x.id === editId);
+      Object.assign(q, { stem, stageId, stageName: st.name, subjectId: st.subjectId, subjectName: st.subjectName, type, difficulty: diff, options, answer, tags, analysis });
+      Admin.log('编辑', '题目 ' + q.id, stem.slice(0, 40));
+      UI.toast('题目已更新', 'success');
+    } else {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const id = 'Q' + (2840 + questions.length + Math.floor(Math.random() * 40));
+      questions.unshift({
+        id, stem, stageId, stageName: st.name, subjectId: st.subjectId, subjectName: st.subjectName,
+        type, difficulty: diff, status: 'pending', options, answer, tags, analysis,
+        createdAt: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+        people: 0, correct: 0, accuracy: 0
+      });
+      Admin.log('新增', '题目 ' + id, stem.slice(0, 40));
+      UI.toast('题目已创建，等待审核', 'success');
+    }
+    Admin.saveQuestions(questions);
+    UI.close('qModal');
+    render();
+  };
+
+  /* ---------- 表格交互 ---------- */
+  document.getElementById('qbBody').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    const q = questions.find(x => x.id === b.dataset.id);
+    if (q) doAction(q, b.dataset.act);
+  });
+
+  document.getElementById('qbBody').addEventListener('change', e => {
+    const c = e.target.closest('.row-check'); if (!c) return;
+    if (c.checked) selected.add(c.dataset.id); else selected.delete(c.dataset.id);
+    updateBatchBar();
+  });
+
+  document.getElementById('checkAll').addEventListener('change', e => {
+    document.querySelectorAll('.row-check').forEach(c => {
+      c.checked = e.target.checked;
+      if (e.target.checked) selected.add(c.dataset.id); else selected.delete(c.dataset.id);
+    });
+    updateBatchBar();
+  });
+
+  document.getElementById('batchBar').addEventListener('click', async e => {
+    const b = e.target.closest('[data-batch]'); if (!b) return;
+    const ids = [...selected];
+    if (!ids.length) return;
+    if (b.dataset.batch === 'delete') {
+      const ok = await UI.confirm({ title: '批量删除题目', message: `确定删除选中的 ${ids.length} 道题目吗？删除后不可恢复。`, confirmText: '确认删除', danger: true, icon: '🗑' });
+      if (!ok) return;
+      questions = questions.filter(q => !selected.has(q.id));
+      Admin.saveQuestions(questions);
+      Admin.log('删除', '题库管理', `批量删除 ${ids.length} 道题目`);
+      clearSelection(); render();
+      UI.toast(`已删除 ${ids.length} 道题目`, 'success');
+      return;
+    }
+    const next = b.dataset.batch === 'publish' ? 'published' : 'offline';
+    questions.forEach(q => { if (selected.has(q.id)) q.status = next; });
+    Admin.saveQuestions(questions);
+    Admin.log('编辑', '题库管理', `批量${next === 'published' ? '上架' : '下架'} ${ids.length} 道题目`);
+    clearSelection(); render();
+    UI.toast(`已批量${next === 'published' ? '上架' : '下架'} ${ids.length} 道题目`, 'success');
+  });
+
+  /* ---------- 筛选 ---------- */
+  document.getElementById('kw').addEventListener('input', UI.debounce(e => {
+    filters.kw = e.target.value; page = 1; render();
+  }, 300));
+  ['stageFilter', 'typeFilter', 'diffFilter', 'statusFilter'].forEach(id => {
+    document.getElementById(id).addEventListener('change', e => {
+      const map = { stageFilter: 'stage', typeFilter: 'type', diffFilter: 'diff', statusFilter: 'status' };
+      filters[map[id]] = e.target.value; page = 1; render();
+    });
+  });
+  document.getElementById('qbPager').addEventListener('click', e => {
+    const b = e.target.closest('button[data-page]'); if (!b || b.disabled) return;
+    page = +b.dataset.page; render();
+  });
+
+  /* ---------- 导出 ---------- */
+  function downloadExcel(rows, filename) {
+    const head = ['ID', '题目', '阶段', '学科', '类型', '难度', '状态', '正确答案', '解析', '创建时间'];
+    const bodyRows = rows.map(q => [q.id, q.stem, q.stageName, q.subjectName, UI.typeName(q.type), UI.diffName(q.difficulty), (DB.STATUS[q.status] || q.status), q.answer || '', q.analysis || '', q.createdAt]);
+    const html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>' +
+      head.map(h => `<th>${UI.esc(h)}</th>`).join('') + '</tr></thead><tbody>' +
+      bodyRows.map(r => '<tr>' + r.map(c => `<td style="mso-number-format:'\\@'">${UI.esc(c)}</td>`).join('') + '</tr>').join('') +
+      '</tbody></table></body></html>';
+    const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  }
+
+  document.getElementById('exportBtn').onclick = () => {
+    const list = filtered();
+    if (!list.length) { UI.toast('当前没有可导出的题目', 'warn'); return; }
+    downloadExcel(list, '题库导出_2026-11-05.xls');
+    Admin.log('导出', '题库管理', `导出 ${list.length} 道题目`);
+    UI.toast(`已导出 ${list.length} 道题目`, 'success');
+  };
+
+  /* ---------- 导入 ---------- */
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault(); dropzone.classList.remove('drag');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ''; });
+
+  document.getElementById('importBtn').onclick = () => {
+    importFile = null; importRows = null;
+    document.getElementById('fileInfo').textContent = '未选择文件';
+    document.getElementById('importPreview').innerHTML = '';
+    document.getElementById('confirmImport').disabled = true;
+    UI.open('importModal');
+  };
+
+  function handleFile(file) {
+    if (!/\.(xlsx|xls)$/i.test(file.name)) { UI.toast('仅支持 .xlsx / .xls 格式', 'error'); return; }
+    if (file.size > 10 * 1024 * 1024) { UI.toast('文件不能超过 10MB', 'error'); return; }
+    importFile = file;
+    document.getElementById('fileInfo').innerHTML = `<span style="color:var(--text-2);font-weight:600">${UI.esc(file.name)}</span> · ${(file.size / 1024).toFixed(1)} KB <span class="badge badge-success">解析完成</span>`;
+    const samples = DB.ALL_QUESTIONS.slice(0, 4);
+    importRows = samples.map((q, i) => ({
+      line: i + 2, ok: i !== 3, question: q,
+      title: q.stem,
+      reason: i === 3 ? '选项数量不足，无法确定正确答案' : ''
+    }));
+    importRows.push({ line: 7, ok: false, title: '示例：以下哪项不属于容器编排工具？', reason: '缺少「阶段」字段，无法定位所属阶段' });
+    renderImportPreview();
+  }
+
+  function renderImportPreview() {
+    const box = document.getElementById('importPreview');
+    if (!importRows) { box.innerHTML = ''; document.getElementById('confirmImport').disabled = true; return; }
+    const valid = importRows.filter(r => r.ok);
+    box.innerHTML = `
+      <div class="parse-summary">
+        <span class="badge badge-success">有效 ${valid.length}</span>
+        <span class="badge badge-danger">无效 ${importRows.length - valid.length}</span>
+        <span class="small muted" style="margin-left:auto">仅导入有效行，单次上限 500 道</span>
+      </div>
+      <div class="parse-list">
+        ${importRows.map(r => `
+          <div class="import-row ${r.ok ? '' : 'err'}">
+            <span class="ir-badge badge ${r.ok ? 'badge-success' : 'badge-danger'}">${r.ok ? '有效' : '无效'}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600" class="ellipsis">第 ${r.line} 行 · ${UI.esc(r.title)}</div>
+              <div class="small muted">${r.reason ? UI.esc(r.reason) : '字段完整，可正常导入'}</div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+    const btn = document.getElementById('confirmImport');
+    btn.disabled = !valid.length;
+    btn.textContent = `确认导入 ${valid.length} 道题目`;
+  }
+
+  document.getElementById('confirmImport').onclick = () => {
+    if (!importRows) return;
+    const valid = importRows.filter(r => r.ok);
+    valid.forEach((r, i) => {
+      const q = r.question;
+      const st = stageOptions.find(x => x.id === q.stageId) || stageOptions[0];
+      questions.unshift({
+        id: 'Q' + (2900 + questions.length + i), stem: q.stem,
+        stageId: st.id, stageName: st.name, subjectId: st.subjectId, subjectName: st.subjectName,
+        type: q.type, difficulty: q.difficulty, status: 'pending',
+        options: q.options || [], answer: q.answer || '', analysis: q.analysis || '', tags: q.tags || [],
+        createdAt: '2026-11-05 10:26', people: 0, correct: 0, accuracy: 0
+      });
+    });
+    Admin.saveQuestions(questions);
+    Admin.log('导入', '题库管理', `通过 Excel 导入 ${valid.length} 道题目`);
+    UI.close('importModal');
+    UI.toast(`已导入 ${valid.length} 道题目，等待审核`, 'success');
+    render();
+  };
+
+  document.getElementById('tplBtn').onclick = () => {
+    const head = ['题目', '阶段', '类型', '难度', '选项A', '选项B', '选项C', '选项D', '正确答案', '解析'];
+    const sample = ['在 Transformer 中 Self-Attention 的作用是？', '大模型基础与 Prompt 工程', '单选', '简单', '捕捉序列中的依赖关系', '非线性变换', '降低参数量', '文本向量化', 'A', '自注意力用于捕捉长距离依赖。'];
+    const html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body><table border="1"><tr>' +
+      head.map(h => `<th>${h}</th>`).join('') + '</tr><tr>' + sample.map(c => `<td>${c}</td>`).join('') + '</tr></table></body></html>';
+    const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '题库导入模板.xls';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    UI.toast('导入模板已下载', 'success');
+  };
+
+  /* ---------- 初始化 ---------- */
+  fillStageFilter();
+  if (filters.status) document.getElementById('statusFilter').value = filters.status;
+  render();
+})();
+</script>
+<style>
+  .qb-stats { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 18px; }
+  .qb-stat { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow: hidden; }
+  .qb-stat .qbs-label { display: block; font-size: 12px; color: var(--muted); }
+  .qb-stat .qbs-num { display: block; font-size: 24px; font-weight: 800; margin-top: 3px; letter-spacing: -.02em; }
+  .qb-stat .qbs-icon { position: absolute; right: 12px; top: 12px; font-size: 15px; opacity: .5; }
+  .stem-link { display: block; max-width: 100%; text-align: left; font-weight: 600; color: var(--text); font-size: 13px; line-height: 1.55; }
+  .stem-link:hover { color: var(--brand); }
+  .row-check, #checkAll { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; }
+  .opt-placeholder { padding: 14px; border: 1px dashed var(--line-2); border-radius: 9px; font-size: 12.5px; color: var(--muted-2); text-align: center; background: #fafbfc; }
+  .opt-list { display: flex; flex-direction: column; gap: 8px; }
+  .opt-row { display: flex; align-items: center; gap: 9px; }
+  .opt-row .opt-key { width: 24px; height: 24px; border-radius: 6px; background: #f2f4f7; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--muted); flex: none; }
+  .opt-row .opt-text { height: 36px; }
+  .opt-row .opt-correct { flex: none; width: 62px; font-size: 12px; white-space: nowrap; }
+  .opt-row .opt-del { color: var(--muted-2); flex: none; }
+  .opt-row .opt-del:hover { color: var(--danger); background: var(--danger-soft); }
+  .judge-choices { display: flex; gap: 12px; }
+  .judge-choice { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border: 1px solid var(--line-2); border-radius: 9px; font-size: 13px; cursor: pointer; transition: .15s; }
+  .judge-choice.active { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
+  .judge-choice input { accent-color: var(--brand); }
+  .detail-section { padding: 0 0 18px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .detail-section:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+  .ds-label { font-size: 12px; color: var(--muted); font-weight: 650; margin-bottom: 8px; letter-spacing: .03em; }
+  .ds-stem { font-size: 15px; font-weight: 650; line-height: 1.7; }
+  .ds-text { font-size: 13px; color: var(--text-2); line-height: 1.8; white-space: pre-wrap; }
+  .detail-opts { display: flex; flex-direction: column; gap: 7px; }
+  .do-item { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border-radius: 8px; background: #fafbfc; font-size: 13px; color: var(--text-2); }
+  .do-item b { width: 20px; height: 20px; border-radius: 5px; background: #fff; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; font-size: 11px; flex: none; }
+  .do-item.right { background: var(--success-soft); }
+  .do-item.right b { background: var(--success); border-color: var(--success); color: #fff; }
+  .do-item .badge { margin-left: auto; height: 20px; font-size: 11px; }
+  .detail-answer { font-size: 13px; color: var(--muted); padding: 12px; background: #fafbfc; border-radius: 8px; }
+  .stat-mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat-mini-grid > div { background: #fafbfc; border-radius: 9px; padding: 12px; text-align: center; }
+  .stat-mini-grid b { display: block; font-size: 20px; font-weight: 800; }
+  .stat-mini-grid span { font-size: 11.5px; color: var(--muted); }
+  .parse-summary { display: flex; gap: 8px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .parse-list { max-height: 240px; overflow: auto; }
+  .import-row:last-child { border-bottom: 0; }
+  @media (max-width: 1280px) { .qb-stats { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 760px) { .qb-stats { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</body>
+</html>

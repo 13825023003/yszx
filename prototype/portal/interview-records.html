@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>面试记录 · 云枢智学</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/portal.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body>
+
+<div id="siteHeader"></div>
+
+<section class="page-hero">
+  <div class="container-wide">
+    <div class="row-between wrap gap-16">
+      <div>
+        <h1>面试记录</h1>
+        <p class="desc">回看每一场 AI 面试的表现与报告，跟踪能力变化趋势</p>
+      </div>
+      <a class="btn btn-primary" href="interview-config.html">开始新的面试</a>
+    </div>
+  </div>
+</section>
+
+<div class="page-body">
+  <div class="container-wide">
+    <div class="record-stats mb-16" id="recStats"></div>
+
+    <div class="card" style="overflow:hidden">
+      <div class="row-between" style="padding:16px 20px;border-bottom:1px solid var(--line)">
+        <div>
+          <div style="font-size:15px;font-weight:750">全部记录</div>
+          <div class="small muted" style="margin-top:2px">按面试时间倒序排列</div>
+        </div>
+        <select class="select" id="subjectFilter" style="width:auto;min-width:150px;height:34px">
+          <option value="all">全部方向</option>
+        </select>
+      </div>
+      <div id="recordList"></div>
+      <div class="pager" id="pager" style="padding:14px 20px"></div>
+    </div>
+  </div>
+</div>
+
+<div id="siteFooter"></div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script>
+(function () {
+  if (!UI.requireUser()) return;
+  UI.renderHeader('interview');
+  UI.renderFooter();
+
+  const PAGE_SIZE = 5;
+  let page = 1;
+  let filter = 'all';
+
+  const extras = UI.Store.get('extra_records', []);
+  const all = extras.concat(DB.SEED_RECORDS);
+  const sorted = all.slice().sort((a, b) => dateVal(b.date) - dateVal(a.date));
+
+  function dateVal(s) { return new Date(String(s).replace(/-/g, '/').replace(/\//g, '/')).getTime() || 0; }
+  function parseDuration(s) {
+    if (!s) return 0;
+    if (s.indexOf('分') > -1) {
+      const m = s.match(/(?:(\d+)\s*小时)?\s*(\d+)\s*分(?:(\d+)\s*秒)?/);
+      if (m) return (+(m[1] || 0)) * 3600 + (+m[2]) * 60 + (+(m[3] || 0));
+    }
+    const parts = s.split(':').map(Number);
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return 0;
+  }
+  function fmtTotal(sec) {
+    const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+    return h ? `${h} 小时 ${m} 分` : `${m} 分钟`;
+  }
+
+  function renderStats() {
+    const total = sorted.length;
+    const scores = sorted.map(r => r.score);
+    const avg = total ? Math.round(scores.reduce((a, b) => a + b, 0) / total) : 0;
+    const max = total ? Math.max(...scores) : 0;
+    const dur = sorted.reduce((n, r) => n + parseDuration(r.duration), 0);
+    document.getElementById('recStats').innerHTML = `
+      <div class="a-stat" style="border-radius:14px">
+        <div class="as-top"><span class="as-label">面试总次数</span><span class="as-icon" style="background:#eef2ff;color:#4f46e5">🎙</span></div>
+        <div class="as-num">${total}<span style="font-size:13px;color:var(--muted);font-weight:600"> 场</span></div>
+        <div class="as-trend">累计完成的 AI 模拟面试</div>
+      </div>
+      <div class="a-stat" style="border-radius:14px">
+        <div class="as-top"><span class="as-label">平均分数</span><span class="as-icon" style="background:#ecfdf3;color:#12b76a">📈</span></div>
+        <div class="as-num">${avg}<span style="font-size:13px;color:var(--muted);font-weight:600"> 分</span></div>
+        <div class="as-trend">满分 100 分</div>
+      </div>
+      <div class="a-stat" style="border-radius:14px">
+        <div class="as-top"><span class="as-label">最高分数</span><span class="as-icon" style="background:#fffaeb;color:#f79009">🏆</span></div>
+        <div class="as-num">${max}<span style="font-size:13px;color:var(--muted);font-weight:600"> 分</span></div>
+        <div class="as-trend">最佳表现</div>
+      </div>
+      <div class="a-stat" style="border-radius:14px">
+        <div class="as-top"><span class="as-label">累计时长</span><span class="as-icon" style="background:#f5f3ff;color:#7c3aed">⏱</span></div>
+        <div class="as-num" style="font-size:23px">${fmtTotal(dur)}</div>
+        <div class="as-trend">累计面试作答时间</div>
+      </div>`;
+  }
+
+  function renderFilter() {
+    const ids = [...new Set(sorted.map(r => r.subjectId))];
+    const sel = document.getElementById('subjectFilter');
+    sel.innerHTML = '<option value="all">全部方向</option>' + ids.map(id => `<option value="${id}">${DB.SUBJECT_MAP[id] ? DB.SUBJECT_MAP[id].name : id}</option>`).join('');
+    sel.value = filter;
+    sel.onchange = () => { filter = sel.value; page = 1; renderList(); };
+  }
+
+  function scoreStyle(n) {
+    return n >= 80 ? { bg: '#ecfdf3', color: '#12b76a', ring: '#12b76a' }
+      : n >= 60 ? { bg: '#fffaeb', color: '#f79009', ring: '#f79009' }
+      : { bg: '#fef3f2', color: '#f04438', ring: '#f04438' };
+  }
+
+  function renderList() {
+    const list = filter === 'all' ? sorted : sorted.filter(r => r.subjectId === filter);
+    const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    if (page > pages) page = pages;
+    const slice = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const wrap = document.getElementById('recordList');
+
+    if (!list.length) {
+      wrap.innerHTML = `<div class="empty"><div class="em-icon">🗂</div><div class="em-title">暂无面试记录</div><div class="em-sub">完成一场 AI 面试后，报告会自动保存在这里</div><a class="btn btn-primary btn-sm mt-16" href="interview-config.html">开始第一次面试</a></div>`;
+      document.getElementById('pager').innerHTML = '';
+      return;
+    }
+
+    wrap.innerHTML = slice.map(r => {
+      const st = scoreStyle(r.score);
+      const subject = DB.SUBJECT_MAP[r.subjectId];
+      return `
+        <div class="record-row">
+          <div class="rec-score" style="background:${st.bg};color:${st.color}"><b>${r.score}</b><span>分</span></div>
+          <div class="rr-main">
+            <div class="rr-title">${subject ? subject.icon + ' ' : ''}${UI.esc(r.subjectName || r.subjectId)}</div>
+            <div class="rr-meta">
+              <span>🕒 ${UI.esc(r.date)}</span>
+              <span>⏱ ${UI.esc(r.duration || '—')}</span>
+              <span>📝 ${r.count} 题</span>
+              <span class="badge ${r.difficulty === '简单' ? 'badge-success' : r.difficulty === '困难' ? 'badge-danger' : 'badge-warn'}">${UI.esc(r.difficulty)}难度</span>
+            </div>
+          </div>
+          <div class="row gap-8" style="flex:none">
+            <button class="btn btn-outline btn-sm" data-report="${r.id}">查看报告</button>
+            <button class="btn btn-soft btn-sm" data-again="${r.subjectId}">再来一次</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('[data-report]').forEach(b => b.onclick = () => openReport(b.dataset.report));
+    wrap.querySelectorAll('[data-again]').forEach(b => b.onclick = () => location.href = `interview-config.html?subject=${b.dataset.again}`);
+
+    document.getElementById('pager').innerHTML = `
+      <span class="small muted">共 ${list.length} 条记录 · 第 ${page} / ${pages} 页</span>
+      <div class="pages">
+        <button ${page === 1 ? 'disabled' : ''} data-page="${page - 1}">‹</button>
+        ${Array.from({ length: pages }, (_, i) => `<button class="${page === i + 1 ? 'active' : ''}" data-page="${i + 1}">${i + 1}</button>`).join('')}
+        <button ${page === pages ? 'disabled' : ''} data-page="${page + 1}">›</button>
+      </div>`;
+    document.querySelectorAll('#pager [data-page]').forEach(b => b.onclick = () => {
+      const p = +b.dataset.page;
+      if (p >= 1 && p <= pages) { page = p; renderList(); }
+    });
+  }
+
+  function openReport(id) {
+    const rec = sorted.find(r => r.id === id);
+    if (!rec) return;
+    const subject = DB.SUBJECT_MAP[rec.subjectId] || DB.SUBJECTS[0];
+    const scoreArr = Array.from({ length: rec.count || 5 }, () => rec.score / 10);
+    // 取该记录之前的历史成绩
+    const earlier = sorted.filter(r => r.subjectId === rec.subjectId && dateVal(r.date) < dateVal(rec.date));
+    const previousScore = earlier.length ? earlier[0].score : null;
+    const rep = UI.buildReport({
+      subjectId: rec.subjectId, subjectName: subject.name,
+      difficulty: rec.difficulty, count: rec.count,
+      durationSec: parseDuration(rec.duration),
+      scores: scoreArr,
+      extra: { previousScore: previousScore }
+    });
+    rep.score = rec.score;
+    rep.accuracy = Math.round(rec.score * 0.92);
+    rep.date = rec.date;
+    rep.durationSec = parseDuration(rec.duration);
+    rep.count = rec.count;
+    UI.Store.set('last_report', rep);
+
+    const latest = extras[0];
+    if (!latest || latest.id !== rec.id) UI.Store.remove('last_dialogue');
+    location.href = 'interview-report.html';
+  }
+
+  renderStats();
+  renderFilter();
+  renderList();
+})();
+</script>
+</body>
+</html>

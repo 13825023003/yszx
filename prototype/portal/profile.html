@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>个人中心 · 云枢智学</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/portal.css">
+</head>
+<body>
+
+<div id="siteHeader"></div>
+
+<section class="page-hero">
+  <div class="container-wide">
+    <h1>个人中心</h1>
+    <p class="desc">管理个人资料，查看你的学习数据</p>
+  </div>
+</section>
+
+<div class="page-body">
+  <div class="container-wide">
+    <div id="welcomeBanner" style="display:none" class="mb-16">
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:12px;background:var(--brand-soft);border:1px solid #c7d2fe">
+        <span style="font-size:20px">🎉</span>
+        <div style="flex:1;font-size:13px;color:var(--brand);font-weight:600">注册成功！完善个人资料，并选择一个技术方向开始你的学习之旅。</div>
+        <a class="btn btn-primary btn-sm" href="roadmap.html">选择技术方向 →</a>
+      </div>
+    </div>
+
+    <div class="profile-grid">
+      <!-- 左：用户卡片 -->
+      <div>
+        <div class="profile-card">
+          <div class="profile-cover"></div>
+          <div class="profile-main">
+            <div class="avatar avatar-lg" style="width:76px;height:76px;font-size:26px" id="cardAvatar">林</div>
+            <h3 id="cardName">林晓</h3>
+            <div class="p-sub" id="cardPhone">139****5678</div>
+            <div class="mt-8"><span class="badge badge-brand">学员</span> <span class="badge badge-outline">Lv.3 进阶学习者</span></div>
+            <div class="profile-mini-stats">
+              <div><b id="statQuestions">386</b><span>做题数</span></div>
+              <div><b id="statInterviews">12</b><span>面试数</span></div>
+              <div><b id="statMistakes">0</b><span>错题数</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card-pad mt-16">
+          <div class="row-between mb-16">
+            <span class="title-sm">学习数据</span>
+            <a class="link small" href="interview-records.html">面试记录 →</a>
+          </div>
+          <div style="display:grid;gap:14px">
+            <div class="row-between" style="font-size:13px"><span class="muted">已完成题目</span><b id="learnQ">386 题</b></div>
+            <div class="row-between" style="font-size:13px"><span class="muted">平均正确率</span><b style="color:var(--success)" id="learnAcc">86%</b></div>
+            <div class="row-between" style="font-size:13px"><span class="muted">AI 面试次数</span><b id="learnIv">12 次</b></div>
+            <div class="row-between" style="font-size:13px"><span class="muted">连续学习</span><b id="learnStreak">7 天</b></div>
+          </div>
+          <div class="divider"></div>
+          <a class="btn btn-outline btn-block btn-sm" href="mistakes.html">查看我的错题本</a>
+        </div>
+      </div>
+
+      <!-- 右：资料表 -->
+      <div class="settings-card">
+        <div class="sc-head">
+          <h3>基本信息</h3>
+          <p>这些信息会展示在你的个人主页与学习报告中</p>
+        </div>
+
+        <div class="field mb-24">
+          <label>头像</label>
+          <div class="avatar-upload">
+            <div class="au-preview" id="avatarPreview">林</div>
+            <div>
+              <button class="btn btn-outline btn-sm" id="uploadBtn">上传头像</button>
+              <div class="hint mt-8">支持 JPG、PNG，建议尺寸 200×200，文件不超过 2MB</div>
+            </div>
+            <input type="file" id="avatarInput" accept="image/jpeg,image/png" style="display:none" />
+          </div>
+        </div>
+
+        <div class="form-grid cols-2">
+          <div class="field" id="f-name">
+            <label class="req">用户名</label>
+            <input class="input" id="nameInput" maxlength="20" placeholder="请输入用户名" />
+            <div class="err-text">用户名不能为空</div>
+          </div>
+          <div class="field">
+            <label>手机号</label>
+            <input class="input" id="phoneInput" disabled />
+            <div class="hint">手机号不可修改（脱敏展示）</div>
+          </div>
+          <div class="field" id="f-email">
+            <label>邮箱</label>
+            <input class="input" id="emailInput" type="email" placeholder="请输入邮箱" />
+            <div class="err-text">请输入正确的邮箱格式</div>
+          </div>
+          <div class="field">
+            <label>性别</label>
+            <div class="gender-seg" id="genderSeg">
+              <button type="button" data-gender="male">男</button>
+              <button type="button" data-gender="female">女</button>
+              <button type="button" data-gender="secret">保密</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider" style="margin:24px 0"></div>
+
+        <div class="row-between wrap gap-12">
+          <span class="small muted">上次登录：2026-11-05 09:12 · IP 192.168.12.34</span>
+          <div class="row gap-8">
+            <button class="btn btn-outline" id="resetBtn">还原修改</button>
+            <button class="btn btn-primary" id="saveBtn">保存修改</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-pad mt-16">
+      <div class="row-between wrap gap-12">
+        <div>
+          <div class="title-sm">账号安全</div>
+          <div class="small muted mt-8">定期修改密码，保护你的学习数据安全</div>
+        </div>
+        <div class="row gap-8">
+          <a class="btn btn-outline btn-sm" href="forgot-password.html">修改密码</a>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger)" id="logoutBtn">退出登录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="siteFooter"></div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script>
+(function () {
+  if (!UI.requireUser()) return;
+  UI.renderHeader('profile');
+  UI.renderFooter();
+  UI.bindModals();
+
+  let user = UI.Store.get('user', {});
+  let gender = user.gender || 'secret';
+  let draftAvatar = user.avatar || '';
+
+  const mistakes = UI.Store.get('mistakes', DB.SEED_MISTAKES);
+  const mistakeCount = mistakes.filter(m => !m.mastered).length;
+
+  function maskedPhone(p) { return p ? p.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') : '—'; }
+  function avatarHtml(name, src, size) {
+    if (src) return `<img src="${src}" alt="avatar" style="width:100%;height:100%;object-fit:cover">`;
+    return UI.esc(UI.initial(name));
+  }
+
+  function renderCard() {
+    const name = document.getElementById('nameInput').value.trim() || user.name;
+    document.getElementById('cardName').textContent = name;
+    document.getElementById('cardPhone').textContent = maskedPhone(user.phone);
+    document.getElementById('cardAvatar').innerHTML = avatarHtml(name, draftAvatar);
+    document.getElementById('avatarPreview').innerHTML = avatarHtml(name, draftAvatar);
+    document.getElementById('statQuestions').textContent = user.questions || 0;
+    document.getElementById('statInterviews').textContent = user.interviews || 0;
+    document.getElementById('statMistakes').textContent = mistakeCount;
+    document.getElementById('learnQ').textContent = (user.questions || 0) + ' 题';
+    document.getElementById('learnAcc').textContent = (user.accuracy || 0) + '%';
+    document.getElementById('learnIv').textContent = (user.interviews || 0) + ' 次';
+    document.getElementById('learnStreak').textContent = (user.streak || 0) + ' 天';
+  }
+
+  function fillForm(u) {
+    document.getElementById('nameInput').value = u.name || '';
+    document.getElementById('phoneInput').value = maskedPhone(u.phone);
+    document.getElementById('emailInput').value = u.email || '';
+    gender = u.gender || 'secret';
+    document.querySelectorAll('#genderSeg button').forEach(b => b.classList.toggle('active', b.dataset.gender === gender));
+    renderCard();
+  }
+
+  document.getElementById('genderSeg').addEventListener('click', e => {
+    const b = e.target.closest('button[data-gender]'); if (!b) return;
+    gender = b.dataset.gender;
+    document.querySelectorAll('#genderSeg button').forEach(x => x.classList.toggle('active', x === b));
+  });
+
+  document.getElementById('nameInput').addEventListener('input', () => renderCard());
+
+  /* 头像上传 */
+  document.getElementById('uploadBtn').onclick = () => document.getElementById('avatarInput').click();
+  document.getElementById('avatarInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!/image\/(jpeg|png)/.test(file.type)) { UI.toast('仅支持 JPG / PNG 格式', 'error'); e.target.value = ''; return; }
+    if (file.size > 2 * 1024 * 1024) { UI.toast('图片大小不能超过 2MB', 'error'); e.target.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      draftAvatar = ev.target.result;
+      renderCard();
+      UI.toast('头像已选择，点击「保存修改」生效', 'success');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+
+  /* 保存 */
+  document.getElementById('saveBtn').onclick = () => {
+    const name = document.getElementById('nameInput').value.trim();
+    const email = document.getElementById('emailInput').value.trim();
+    const nameOk = !!name;
+    document.getElementById('f-name').classList.toggle('invalid', !nameOk);
+    const emailOk = !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    document.getElementById('f-email').classList.toggle('invalid', !emailOk);
+    if (!nameOk) { UI.toast('用户名不能为空', 'error'); document.getElementById('nameInput').focus(); return; }
+    if (!emailOk) { UI.toast('请输入正确的邮箱格式', 'error'); return; }
+    user = Object.assign(user, { name: name, email: email, gender: gender, avatar: draftAvatar });
+    UI.Store.set('user', user);
+    const uname = document.querySelector('.user-trigger .uname');
+    if (uname) uname.textContent = name;
+    renderCard();
+    UI.toast('个人资料已保存', 'success');
+  };
+
+  /* 还原 */
+  document.getElementById('resetBtn').onclick = async () => {
+    const ok = await UI.confirm({ title: '还原修改', message: '将放弃当前未保存的修改，恢复为上次保存的资料。', confirmText: '还原', icon: '↻' });
+    if (!ok) return;
+    user = UI.Store.get('user', {});
+    draftAvatar = user.avatar || '';
+    fillForm(user);
+    UI.toast('已还原为上次保存的资料', 'info');
+  };
+
+  document.getElementById('logoutBtn').onclick = async () => {
+    const ok = await UI.confirm({ title: '退出登录', message: '退出后需要重新登录才能继续练习与面试。', confirmText: '退出登录', danger: true, icon: '↪' });
+    if (!ok) return;
+    UI.Store.set('logged_out', true);
+    UI.Store.remove('user');
+    UI.toast('已退出登录', 'success');
+    setTimeout(() => location.href = 'index.html', 400);
+  };
+
+  if (new URLSearchParams(location.search).get('welcome') === '1') {
+    document.getElementById('welcomeBanner').style.display = '';
+  }
+
+  fillForm(user);
+})();
+</script>
+</body>
+</html>

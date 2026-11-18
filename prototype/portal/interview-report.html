@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>面试报告 · 云枢智学</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/portal.css">
+<style>
+  .report-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .replay-list { display: flex; flex-direction: column; gap: 12px; max-height: 56vh; overflow-y: auto; padding-right: 4px; }
+  .replay-item { display: flex; gap: 10px; font-size: 13px; }
+  .replay-item .ri-av { width: 28px; height: 28px; border-radius: 8px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 12px; background: #eef2ff; }
+  .replay-item.me .ri-av { background: #f2f4f7; }
+  .replay-item .ri-body { flex: 1; }
+  .replay-item .ri-role { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .replay-item .ri-text { background: #f8f9fc; border-radius: 9px; padding: 9px 12px; line-height: 1.7; color: var(--text-2); }
+  .replay-item.me .ri-text { background: #f3f4ff; }
+</style>
+</head>
+<body>
+
+<div id="siteHeader"></div>
+
+<section class="page-hero">
+  <div class="container-wide">
+    <div class="row-between wrap gap-16">
+      <div>
+        <h1>面试报告</h1>
+        <p class="desc">基于本次回答生成的能力评估，建议结合薄弱项安排下一轮练习</p>
+      </div>
+      <div class="report-actions" id="topActions"></div>
+    </div>
+  </div>
+</section>
+
+<div class="page-body">
+  <div class="container-wide" id="reportRoot"></div>
+</div>
+
+<div id="siteFooter"></div>
+
+<!-- 回放 -->
+<div class="modal-mask" id="replayModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div><h3>面试回放</h3><div class="sub">按时间顺序回看本次问答与逐题评分</div></div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body"><div class="replay-list" id="replayList"></div></div>
+    <div class="modal-foot"><button class="btn btn-outline" data-close>关闭</button></div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script>
+(function () {
+  if (!UI.requireUser()) return;
+  UI.renderHeader('interview');
+  UI.renderFooter();
+  UI.bindModals();
+
+  /* ---------- 报告数据 ---------- */
+  let report = UI.Store.get('last_report', null);
+  if (!report) {
+    const seed = DB.SEED_RECORDS[0];
+    report = UI.buildReport({
+      subjectId: seed.subjectId, subjectName: seed.subjectName,
+      difficulty: seed.difficulty, count: seed.count,
+      durationSec: 1112,
+      scores: [8.2, 8.0, 7.8, 8.6, 7.9, 8.2, 8.5, 8.1],
+      extra: { previousScore: 76 }
+    });
+    report.date = seed.date;
+    report.durationSec = 1112;
+  }
+
+  const prev = report.previousScore;
+  const diff = prev != null ? report.score - prev : null;
+
+  function trendHtml() {
+    if (diff == null) return '<span class="trend-pill" style="background:#f2f4f7;color:var(--muted)">首次挑战该方向</span>';
+    if (diff >= 5) return `<span class="trend-pill trend-up">↑ 相比上次 +${diff} 分</span>`;
+    if (diff <= -5) return `<span class="trend-pill trend-down">↓ 相比上次 ${diff} 分</span>`;
+    return `<span class="trend-pill trend-flat">→ 相比上次 ${diff >= 0 ? '+' : ''}${diff} 分（持平）</span>`;
+  }
+
+  function fmtDuration(sec) {
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return `${m} 分 ${String(s).padStart(2, '0')} 秒`;
+  }
+  function dimColor(n) { return n >= 80 ? '#12b76a' : n >= 60 ? '#f79009' : '#f04438'; }
+
+  const subject = DB.SUBJECT_MAP[report.subjectId] || DB.SUBJECTS[0];
+
+  const actionsHtml = `
+    <a class="btn btn-outline" href="interview-records.html">查看历史记录</a>
+    <a class="btn btn-outline" href="interview-config.html?subject=${report.subjectId}">再来一次</a>
+    <button class="btn btn-primary" id="replayBtn">查看面试回放</button>`;
+
+  document.getElementById('topActions').innerHTML = actionsHtml;
+
+  document.getElementById('reportRoot').innerHTML = `
+    <div class="report-head reveal">
+      <div class="rh-icon">📊</div>
+      <div style="flex:1;min-width:0">
+        <div class="row gap-8 wrap">
+          <h2 style="font-size:19px;font-weight:800">${UI.esc(report.title)}</h2>
+          <span class="badge badge-success">报告已生成</span>
+        </div>
+        <div class="small muted mt-8">${UI.esc(report.subjectName)} · ${UI.esc(report.difficulty)}难度 · ${UI.esc(report.date)}</div>
+      </div>
+      <div class="report-actions">${actionsHtml}</div>
+    </div>
+
+    <div class="report-grid">
+      <!-- 总分 -->
+      <div class="card reveal">
+        <div class="score-hero">
+          <div class="small muted" style="letter-spacing:.06em;font-weight:700;font-size:11.5px">综合评分</div>
+          <div class="ring-chart">
+            <div id="ringMount"></div>
+            <div class="rc-inner"><b>${report.score}</b><span>满分 100</span></div>
+          </div>
+          ${trendHtml()}
+          <div class="small muted mt-12">基于 ${report.count} 道题的作答表现综合评估</div>
+        </div>
+        <div class="score-detail">
+          <div class="sd-row"><span>回答准确度</span><b style="color:var(--success)">${report.accuracy}%</b></div>
+          <div class="sd-row"><span>面试时长</span><b>${fmtDuration(report.durationSec || 0)}</b></div>
+          <div class="sd-row"><span>答题数量</span><b>${report.count} 题</b></div>
+        </div>
+      </div>
+
+      <!-- 能力分析 -->
+      <div class="card card-pad reveal">
+        <div class="row-between mb-16">
+          <div>
+            <div class="title-md">能力分析</div>
+            <div class="small muted mt-8">6 个维度评估本次面试的表现</div>
+          </div>
+          <span class="badge badge-outline">满分 100</span>
+        </div>
+        <div class="dim-grid">
+          ${report.dims.map(d => `
+            <div class="dim-card">
+              <div class="dc-top"><span class="dc-name">${d.name}</span><span class="dc-score" style="color:${dimColor(d.score)}">${d.score}</span></div>
+              <div class="progress"><i style="width:${d.score}%;background:${dimColor(d.score)}"></i></div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- 优缺点 -->
+    <div class="grid-2 mt-16" style="grid-template-columns:1fr 1fr">
+      <div class="card card-pad reveal">
+        <div class="row gap-8 mb-16">
+          <span style="width:28px;height:28px;border-radius:9px;background:var(--success-soft);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:14px">✓</span>
+          <div class="title-md" style="font-size:16px">你的优点</div>
+        </div>
+        <div class="pros-list">
+          ${report.pros.map(p => `<div class="pi-row"><span class="ic">✓</span><span>${UI.esc(p)}</span></div>`).join('')}
+        </div>
+      </div>
+      <div class="card card-pad reveal">
+        <div class="row gap-8 mb-16">
+          <span style="width:28px;height:28px;border-radius:9px;background:var(--warn-soft);color:var(--warn);display:flex;align-items:center;justify-content:center;font-size:14px">↑</span>
+          <div class="title-md" style="font-size:16px">待提升</div>
+        </div>
+        <div class="pros-list">
+          ${report.improvements.map(p => `<div class="pi-row warn"><span class="ic">!</span><span>${UI.esc(p.text)}<span class="tip">💡 ${UI.esc(p.tip)}</span></span></div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- 改进建议 -->
+    <div class="card card-pad mt-16 reveal">
+      <div class="row gap-8 mb-8">
+        <span style="font-size:18px">🧭</span>
+        <div class="title-md" style="font-size:16px">改进建议</div>
+      </div>
+      <div class="small muted mb-8">按优先级排序，建议在下一轮练习中逐条落实</div>
+      ${report.suggestions.map((s, i) => `<div class="suggest-num"><span class="sn">${i + 1}</span><span>${UI.esc(s)}</span></div>`).join('')}
+    </div>
+
+    <!-- 能力提升建议 -->
+    <div class="mt-24 reveal">
+      <div class="row-between mb-12">
+        <div class="title-md" style="font-size:16px">能力提升建议</div>
+        <span class="small muted">根据本次薄弱项为你推荐</span>
+      </div>
+      <div class="grid-3">
+        <a class="boost-card" href="questions.html?subject=${report.subjectId}">
+          <div class="bc-icon" style="background:#eef2ff">📚</div>
+          <h4>推荐题目</h4>
+          <p>针对「逻辑表达」与「技术深度」两项薄弱维度，建议优先练习 ${UI.esc(subject.stages[0].name)} 的高频题，每道题先列提纲再作答。</p>
+          <div class="bl">去题库练习 →</div>
+        </a>
+        <a class="boost-card" href="roadmap.html?subject=${report.subjectId}">
+          <div class="bc-icon" style="background:#ecfdf3">🎬</div>
+          <h4>推荐课程</h4>
+          <p>沿着「${UI.esc(subject.name)}」学习路线补齐知识盲区，重点观看与本次失分点相关的课程章节，并整理成自己的话术。</p>
+          <div class="bl">查看学习路线 →</div>
+        </a>
+        <a class="boost-card" href="interview-config.html?subject=${report.subjectId}">
+          <div class="bc-icon" style="background:#f5f3ff">🎙</div>
+          <h4>推荐再次面试</h4>
+          <p>建议 3-7 天后再次发起同方向面试，验证改进效果。下一次可尝试「困难」难度，重点训练追问下的深度表达。</p>
+          <div class="bl">再来一次 →</div>
+        </a>
+      </div>
+    </div>
+
+    <div class="row gap-8 mt-24" style="justify-content:center;flex-wrap:wrap">
+      <a class="btn btn-outline" href="interview-records.html">查看历史记录</a>
+      <a class="btn btn-outline" href="interview-config.html?subject=${report.subjectId}">再来一次</a>
+      <button class="btn btn-primary" id="replayBtn2">查看面试回放</button>
+    </div>
+  `;
+
+  /* 环形图 */
+  document.getElementById('ringMount').innerHTML = UI.ringSvg(report.score, 168, 13, {
+    color: report.score >= 80 ? '#12b76a' : report.score >= 60 ? '#f7b027' : '#f04438'
+  });
+  document.getElementById('ringMount').style.cssText = 'width:168px;height:168px;display:flex;align-items:center;justify-content:center';
+
+  /* 回放 */
+  function openReplay() {
+    const dialogue = UI.Store.get('last_dialogue', null);
+    const box = document.getElementById('replayList');
+    const scored = [];
+    if (dialogue && dialogue.length) {
+      dialogue.forEach(m => {
+        if (m.type === 'feedback' && m.score != null) scored.push(m.score);
+      });
+    }
+    if (!dialogue || !dialogue.length) {
+      box.innerHTML = `<div class="empty" style="padding:32px 10px"><div class="em-icon">🎞</div><div class="em-title">暂无回放数据</div><div class="em-sub">完成一场 AI 面试后即可在这里回看完整问答</div></div>`;
+    } else {
+      box.innerHTML = dialogue.map(m => `
+        <div class="replay-item ${m.role === 'me' ? 'me' : ''}">
+          <div class="ri-av">${m.role === 'me' ? '我' : '🤖'}</div>
+          <div class="ri-body">
+            <div class="ri-role">${m.role === 'me' ? '我的回答' : 'AI 面试官'} · ${UI.esc(m.time || '')}
+              ${m.score != null ? `<span class="iv-score-tag" style="margin-left:6px;background:${UI.scoreSoft(m.score)};color:${UI.scoreColor(m.score)}">${m.score.toFixed(1)} 分</span>` : ''}
+            </div>
+            <div class="ri-text">${UI.esc(m.text)}</div>
+          </div>
+        </div>`).join('');
+    }
+    UI.open('replayModal');
+  }
+  document.getElementById('replayBtn').onclick = openReplay;
+  document.getElementById('replayBtn2').onclick = openReplay;
+
+  UI.initReveal();
+})();
+</script>
+</body>
+</html>

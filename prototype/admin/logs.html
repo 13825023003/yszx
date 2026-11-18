@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>操作日志 · 云枢智学管理端</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+  <div id="adminAsideMount"></div>
+  <div class="admin-main">
+    <div id="adminTopbarMount"></div>
+    <main class="admin-content">
+
+      <div class="page-head">
+        <div>
+          <h1>操作日志</h1>
+          <div class="desc">记录管理后台的关键操作，点击任意一行可查看完整详情</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-outline btn-sm" id="exportBtn">⇩ 导出日志</button>
+          <button class="btn btn-danger-soft btn-sm" id="clearBtn">清空日志</button>
+        </div>
+      </div>
+
+      <div class="a-card">
+        <div class="a-toolbar">
+          <div class="search"><i>🔍</i><input class="input" id="logKw" placeholder="搜索用户 / 操作 / 目标" /></div>
+          <select class="select" id="logType">
+            <option value="">全部操作类型</option>
+            <option value="login">登录</option>
+            <option value="create">新增 / 创建 / 上传</option>
+            <option value="edit">修改 / 编辑</option>
+            <option value="delete">删除</option>
+            <option value="status">禁用 / 启用</option>
+            <option value="other">其他</option>
+          </select>
+          <div class="date-range">
+            <input class="input" type="date" id="dateFrom" />
+            <span class="muted small">至</span>
+            <input class="input" type="date" id="dateTo" />
+          </div>
+          <div class="spacer"></div>
+          <span class="small muted" id="logHint"></span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table log-table">
+            <thead>
+              <tr>
+                <th style="width:130px">用户</th>
+                <th style="width:90px">操作</th>
+                <th>目标</th>
+                <th style="width:135px">IP 地址</th>
+                <th style="width:170px">时间</th>
+                <th style="width:50px"></th>
+              </tr>
+            </thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+        <div id="logEmpty" style="display:none"></div>
+        <div class="a-card-body" style="padding:12px 20px 16px">
+          <div class="pager">
+            <span class="small muted" id="pageInfo"></span>
+            <div class="pages" id="logPager"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- 日志详情 -->
+<div class="modal-mask" id="logModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h3>日志详情</h3><div class="sub" id="logModalSub"></div></div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="log-detail-head">
+        <span class="ld-icon" id="ldIcon">📝</span>
+        <div style="flex:1">
+          <div class="row gap-8 wrap"><b id="ldAction">—</b><span class="badge badge-outline" id="ldType">—</span></div>
+          <div class="small muted mt-8" id="ldTarget">—</div>
+        </div>
+      </div>
+      <div class="detail-grid mt-16">
+        <div class="dg-i"><span class="k">操作用户</span><span class="v" id="ldUser">—</span></div>
+        <div class="dg-i"><span class="k">操作类型</span><span class="v" id="ldType2">—</span></div>
+        <div class="dg-i"><span class="k">操作对象</span><span class="v" id="ldTarget2">—</span></div>
+        <div class="dg-i"><span class="k">IP 地址</span><span class="v" id="ldIp">—</span></div>
+        <div class="dg-i"><span class="k">操作时间</span><span class="v" id="ldTime">—</span></div>
+        <div class="dg-i"><span class="k">日志 ID</span><span class="v" id="ldId" style="font-family:var(--mono);font-size:12px">—</span></div>
+      </div>
+      <div class="log-detail-desc">
+        <div class="small muted mb-8">操作详情</div>
+        <div id="ldDetail">—</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script>
+(function () {
+  if (!Admin.renderShell('logs')) return;
+  if (!Admin.isSuper()) {
+    document.querySelector('.admin-content').innerHTML = `<div class="a-card"><div class="empty" style="padding:80px 20px">
+      <div class="em-icon">🔒</div><div class="em-title">无权访问该页面</div>
+      <div class="em-sub">操作日志仅对超级管理员开放</div>
+      <a class="btn btn-outline btn-sm mt-16" href="dashboard.html">返回数据看板</a></div></div>`;
+    return;
+  }
+  UI.bindModals();
+
+  let logs = Admin.getLogs()
+    .slice()
+    .sort((a, b) => String(b.time).localeCompare(String(a.time)));
+  let filters = { kw: '', type: '', from: '', to: '' };
+  let page = 1;
+  const pageSize = 10;
+
+  const TYPE_NAME = { login: '登录', create: '新增', edit: '修改', delete: '删除', status: '禁用 / 启用', other: '其他' };
+  const TYPE_ICON = { login: '🔐', create: '＋', edit: '✎', delete: '🗑', status: '⏻', other: '📝' };
+
+  function typeOf(action) {
+    if (/登录/.test(action)) return 'login';
+    if (/新增|创建|导入|上传/.test(action)) return 'create';
+    if (/编辑|修改/.test(action)) return 'edit';
+    if (/删除/.test(action)) return 'delete';
+    if (/禁用|启用/.test(action)) return 'status';
+    return 'other';
+  }
+  function badgeClass(type) {
+    return type === 'delete' ? 'badge-danger' : type === 'edit' ? 'badge-info' : type === 'create' ? 'badge-brand' : type === 'status' ? 'badge-warn' : type === 'login' ? 'badge-success' : 'badge-gray';
+  }
+
+  function filtered() {
+    const kw = filters.kw.trim().toLowerCase();
+    return logs.filter(l => {
+      if (kw && !(`${l.user} ${l.action} ${l.target}`).toLowerCase().includes(kw)) return false;
+      if (filters.type && typeOf(l.action) !== filters.type) return false;
+      const d = String(l.time).slice(0, 10);
+      if (filters.from && d < filters.from) return false;
+      if (filters.to && d > filters.to) return false;
+      return true;
+    });
+  }
+
+  function render() {
+    const list = filtered();
+    const pages = Math.max(1, Math.ceil(list.length / pageSize));
+    if (page > pages) page = pages;
+    const rows = list.slice((page - 1) * pageSize, page * pageSize);
+    document.getElementById('logHint').textContent = `共 ${list.length} 条日志`;
+    const body = document.getElementById('logBody');
+    const empty = document.getElementById('logEmpty');
+    document.getElementById('clearBtn').disabled = logs.length === 0;
+    document.getElementById('exportBtn').disabled = list.length === 0;
+
+    if (!list.length) {
+      body.innerHTML = '';
+      empty.style.display = '';
+      empty.innerHTML = `<div class="empty"><div class="em-icon">📜</div><div class="em-title">暂无匹配的日志记录</div><div class="em-sub">试试调整关键词或日期范围</div></div>`;
+      document.getElementById('pageInfo').textContent = '暂无数据';
+      document.getElementById('logPager').innerHTML = '';
+      return;
+    }
+    empty.style.display = 'none';
+    body.innerHTML = rows.map(l => {
+      const t = typeOf(l.action);
+      return `<tr class="log-row" data-id="${l.id}" title="点击查看详情">
+        <td><div class="user-cell"><span class="mini-avatar" style="width:26px;height:26px;font-size:10px">${UI.esc(UI.initial(l.user))}</span><span class="uc-n">${UI.esc(l.user)}</span></div></td>
+        <td><span class="badge ${badgeClass(t)}">${UI.esc(l.action)}</span></td>
+        <td class="ellipsis" style="max-width:420px">${UI.esc(l.target)}</td>
+        <td class="small muted">${UI.esc(l.ip)}</td>
+        <td class="small muted nowrap">${UI.esc(l.time)}</td>
+        <td class="muted">›</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('pageInfo').textContent = `第 ${page} / ${pages} 页 · 共 ${list.length} 条`;
+    let btns = `<button data-page="${page - 1}" ${page === 1 ? 'disabled' : ''}>‹</button>`;
+    for (let i = 1; i <= pages; i++) {
+      if (pages > 7 && i > 2 && i < pages - 1 && Math.abs(i - page) > 1) {
+        if (i === 3) btns += '<span style="padding:0 4px;color:var(--muted-2)">…</span>';
+        continue;
+      }
+      btns += `<button data-page="${i}" class="${i === page ? 'active' : ''}">${i}</button>`;
+    }
+    btns += `<button data-page="${page + 1}" ${page === pages ? 'disabled' : ''}>›</button>`;
+    document.getElementById('logPager').innerHTML = btns;
+  }
+
+  /* ---------- 详情 ---------- */
+  document.getElementById('logBody').addEventListener('click', e => {
+    const tr = e.target.closest('.log-row'); if (!tr) return;
+    const l = logs.find(x => x.id === tr.dataset.id); if (!l) return;
+    const t = typeOf(l.action);
+    document.getElementById('logModalSub').textContent = '日志 ID：' + l.id;
+    document.getElementById('ldIcon').textContent = TYPE_ICON[t];
+    document.getElementById('ldAction').textContent = l.action;
+    document.getElementById('ldType').textContent = TYPE_NAME[t];
+    document.getElementById('ldTarget').textContent = l.target;
+    document.getElementById('ldUser').textContent = l.user;
+    document.getElementById('ldType2').textContent = TYPE_NAME[t];
+    document.getElementById('ldTarget2').textContent = l.target;
+    document.getElementById('ldIp').textContent = l.ip;
+    document.getElementById('ldTime').textContent = l.time;
+    document.getElementById('ldId').textContent = l.id;
+    document.getElementById('ldDetail').textContent = l.detail || '无更多详情';
+    UI.open('logModal');
+  });
+
+  /* ---------- 筛选 ---------- */
+  document.getElementById('logKw').addEventListener('input', UI.debounce(e => { filters.kw = e.target.value; page = 1; render(); }, 300));
+  document.getElementById('logType').addEventListener('change', e => { filters.type = e.target.value; page = 1; render(); });
+  document.getElementById('dateFrom').addEventListener('change', e => {
+    filters.from = e.target.value;
+    if (filters.to && filters.from > filters.to) { filters.to = filters.from; document.getElementById('dateTo').value = filters.from; }
+    page = 1; render();
+  });
+  document.getElementById('dateTo').addEventListener('change', e => {
+    filters.to = e.target.value;
+    if (filters.from && filters.to < filters.from) { filters.from = filters.to; document.getElementById('dateFrom').value = filters.to; }
+    page = 1; render();
+  });
+  document.getElementById('logPager').addEventListener('click', e => {
+    const b = e.target.closest('button[data-page]'); if (!b || b.disabled) return;
+    page = +b.dataset.page; render();
+  });
+
+  /* ---------- 导出 CSV ---------- */
+  document.getElementById('exportBtn').onclick = () => {
+    const list = filtered();
+    if (!list.length) { UI.toast('没有可导出的日志', 'warn'); return; }
+    const head = ['日志ID', '操作用户', '操作', '操作类型', '操作对象', 'IP地址', '操作时间', '详情'];
+    const lines = [head].concat(list.map(l => [l.id, l.user, l.action, TYPE_NAME[typeOf(l.action)], l.target, l.ip, l.time, l.detail || '']));
+    const csv = '﻿' + lines.map(row => row.map(v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '操作日志_2026-11-05.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    Admin.log('导出', '操作日志', `导出 ${list.length} 条日志`);
+    logs = Admin.getLogs().slice().sort((a, b) => String(b.time).localeCompare(String(a.time)));
+    render();
+    UI.toast(`已导出 ${list.length} 条日志`, 'success');
+  };
+
+  /* ---------- 清空 ---------- */
+  document.getElementById('clearBtn').onclick = async () => {
+    if (!logs.length) return;
+    const ok = await UI.confirm({
+      title: '清空操作日志',
+      message: '清空后所有历史操作记录将被移除且不可恢复，请确认已完成必要的日志导出。',
+      confirmText: '确认清空', danger: true, icon: '🗑'
+    });
+    if (!ok) return;
+    UI.Store.set('logs_cleared', true);
+    UI.Store.set('logs_extra', []);
+    logs = [];
+    page = 1;
+    render();
+    UI.toast('操作日志已清空', 'success');
+  };
+
+  render();
+})();
+</script>
+<style>
+  .date-range { display: flex; align-items: center; gap: 7px; }
+  .date-range .input { width: 138px; height: 36px; }
+  .log-row { cursor: pointer; }
+  .log-row:hover { background: #f8f9ff !important; }
+  .log-row td:last-child { color: var(--muted-2); font-size: 15px; }
+  .log-detail-head { display: flex; gap: 12px; align-items: flex-start; padding: 13px 14px; background: #fafbfc; border-radius: 10px; }
+  .ld-icon { width: 36px; height: 36px; border-radius: 9px; background: #fff; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 16px; flex: none; }
+  .log-detail-desc { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .log-detail-desc #ldDetail { font-size: 13px; color: var(--text-2); line-height: 1.8; background: #fafbfc; border-radius: 9px; padding: 12px 14px; }
+  .pager .pages { display: flex; gap: 6px; }
+  .pager .pages button { min-width: 32px; height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line-2); background: #fff; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .pager .pages button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .pager .pages button:disabled { opacity: .4; cursor: not-allowed; }
+  .pager .pages button:hover:not(.active):not(:disabled) { border-color: #c7d2fe; color: var(--brand); }
+  .detail-grid .dg-i .v { min-width: 0; word-break: break-all; }
+</style>
+</body>
+</html>

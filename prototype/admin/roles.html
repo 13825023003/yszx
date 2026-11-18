@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>角色管理 · 云枢智学管理端</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+  <div id="adminAsideMount"></div>
+  <div class="admin-main">
+    <div id="adminTopbarMount"></div>
+    <main class="admin-content">
+
+      <div class="page-head">
+        <div>
+          <h1>角色管理</h1>
+          <div class="desc">配置后台角色及其权限点，保存后对角色下全部用户生效</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary btn-sm" id="addRoleBtn">+ 新增角色</button>
+        </div>
+      </div>
+
+      <div class="role-grid" id="roleGrid"></div>
+
+    </main>
+  </div>
+</div>
+
+<!-- 新增角色 -->
+<div class="modal-mask" id="roleModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h3>新增角色</h3><div class="sub">角色创建后可在权限编辑中配置权限点</div></div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field" id="f-roleName">
+          <label class="req">角色名称</label>
+          <input class="input" id="roleNameInput" maxlength="20" placeholder="如：内容运营" />
+          <div class="err-text">请输入角色名称</div>
+        </div>
+        <div class="field" id="f-roleCode">
+          <label class="req">角色编码</label>
+          <input class="input" id="roleCodeInput" maxlength="30" placeholder="如：content_operator（唯一）" />
+          <div class="hint">用于系统识别，需保持唯一，建议使用英文字母、数字与下划线</div>
+          <div class="err-text" id="roleCodeErr">请输入唯一的角色编码</div>
+        </div>
+        <div class="field">
+          <label>角色描述</label>
+          <textarea class="textarea" id="roleDescInput" rows="3" maxlength="100" placeholder="简要说明该角色的职责范围（选填）"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="roleSave">创建角色</button>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑权限 -->
+<div class="modal-mask" id="permModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div>
+        <h3 id="permTitle">编辑权限</h3>
+        <div class="sub">勾选权限点，保存后全量覆盖该角色原有权限 · 共 25 项</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body" style="max-height:62vh;overflow-y:auto">
+      <div class="perm-tree" id="permTree"></div>
+    </div>
+    <div class="modal-foot">
+      <span class="small muted" style="margin-right:auto" id="permCount">已选 0 项</span>
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="permSave">保存权限</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script>
+(function () {
+  if (!Admin.renderShell('roles')) return;
+  if (!Admin.isSuper()) {
+    document.querySelector('.admin-content').innerHTML = `<div class="a-card"><div class="empty" style="padding:80px 20px">
+      <div class="em-icon">🔒</div><div class="em-title">无权访问该页面</div>
+      <div class="em-sub">角色管理仅对超级管理员开放</div>
+      <a class="btn btn-outline btn-sm mt-16" href="dashboard.html">返回数据看板</a></div></div>`;
+    return;
+  }
+  UI.bindModals();
+
+  let roles = Admin.copy(Admin.getRoles());
+  let users = Admin.getUsers();
+  let permRoleId = null;
+  const ROLE_ICON = { super_admin: '🛡', content_reviewer: '🔍', operator: '⚙️' };
+  const save = () => Admin.saveRoles(roles);
+  const userCount = code => users.filter(u => u.role === code).length;
+
+  function permListOf(role) {
+    if (role.perms === 'all' || role.code === 'super_admin') {
+      const all = [];
+      DB.PERM_TREE.forEach(g => g.perms.forEach(p => all.push(g.name + ' · ' + p)));
+      return all;
+    }
+    return Array.isArray(role.perms) ? role.perms : [];
+  }
+
+  function render() {
+    const grid = document.getElementById('roleGrid');
+    if (!roles.length) {
+      grid.innerHTML = `<div class="a-card" style="grid-column:1/-1"><div class="empty">
+        <div class="em-icon">🛡</div><div class="em-title">暂无角色数据</div>
+        <div class="em-sub">点击右上角「新增角色」创建角色</div></div></div>`;
+      return;
+    }
+    grid.innerHTML = roles.map(r => {
+      const count = userCount(r.code);
+      const perms = permListOf(r);
+      const isSuper = r.code === 'super_admin';
+      const tags = isSuper ? '<span class="badge badge-brand">全部权限</span>'
+        : !perms.length ? '<span class="tag">暂无权限</span>'
+        : perms.slice(0, 4).map(p => `<span class="tag">${UI.esc(p)}</span>`).join('') + (perms.length > 4 ? `<span class="tag">+${perms.length - 4}</span>` : '');
+      return `<div class="role-card ${isSuper ? 'role-super' : ''}" data-role="${r.id}">
+        <div class="row-between" style="align-items:flex-start">
+          <div class="rl-icon" style="background:${isSuper ? '#eef2ff' : r.code === 'content_reviewer' ? '#f0f9ff' : '#ecfdf5'}">${ROLE_ICON[r.code] || '🧩'}</div>
+          ${isSuper ? '<span class="badge badge-outline">系统内置</span>' : ''}
+        </div>
+        <h4>${UI.esc(r.name)}</h4>
+        <div class="rl-code">${UI.esc(r.code)} · ${count} 个用户</div>
+        <div class="rl-desc">${UI.esc(r.desc || '暂无角色描述')}</div>
+        <div class="rl-perms">${tags}</div>
+        <div class="rl-foot">
+          <button class="btn btn-outline btn-sm" data-act="perm" data-id="${r.id}" ${isSuper ? 'disabled title="系统内置超级管理员拥有全部权限，不可修改"' : ''}>编辑权限</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);margin-left:auto" data-act="delete" data-id="${r.id}"
+            ${count > 0 || isSuper ? `disabled title="${count > 0 ? '该角色下还有 ' + count + ' 个用户，无法删除' : '系统内置角色不可删除'}"` : ''}>删除</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    grid.querySelectorAll('.role-card').forEach(card => {
+      card.addEventListener('click', e => {
+        if (e.target.closest('button')) return;
+        const r = roles.find(x => x.id === card.dataset.role);
+        if (r && r.code !== 'super_admin') openPerm(r.id);
+      });
+    });
+  }
+
+  /* ---------- 新增角色 ---------- */
+  document.getElementById('addRoleBtn').onclick = () => {
+    document.getElementById('roleNameInput').value = '';
+    document.getElementById('roleCodeInput').value = '';
+    document.getElementById('roleDescInput').value = '';
+    ['f-roleName', 'f-roleCode'].forEach(f => document.getElementById(f).classList.remove('invalid'));
+    UI.open('roleModal');
+    setTimeout(() => document.getElementById('roleNameInput').focus(), 100);
+  };
+
+  document.getElementById('roleSave').onclick = () => {
+    const name = document.getElementById('roleNameInput').value.trim();
+    const code = document.getElementById('roleCodeInput').value.trim();
+    const desc = document.getElementById('roleDescInput').value.trim();
+    const okN = !!name;
+    const okC = !!code && roles.every(r => r.code.toLowerCase() !== code.toLowerCase());
+    document.getElementById('f-roleName').classList.toggle('invalid', !okN);
+    document.getElementById('f-roleCode').classList.toggle('invalid', !okC);
+    document.getElementById('roleCodeErr').textContent = !code ? '请输入角色编码' : '角色编码已存在，请更换';
+    if (!okN) { UI.toast('请输入角色名称', 'error'); return; }
+    if (!okC) { UI.toast(!code ? '请输入角色编码' : '角色编码已存在', 'error'); return; }
+    roles.push({ id: Admin.nextId('role'), name, code, desc, users: 0, perms: [] });
+    save();
+    Admin.log('新增', '角色「' + name + '」', '编码：' + code);
+    UI.close('roleModal');
+    render();
+    UI.toast('角色已创建，请为其配置权限', 'success');
+  };
+
+  /* ---------- 权限树 ---------- */
+  const tree = document.getElementById('permTree');
+  let permSet = new Set();
+
+  function renderTree() {
+    tree.innerHTML = DB.PERM_TREE.map((g, gi) => `
+      <div class="perm-group" data-gi="${gi}">
+        <div class="pg-head">
+          <label class="checkbox"><input type="checkbox" class="group-check" data-gi="${gi}"> ${UI.esc(g.name)}</label>
+          <span class="small muted" style="margin-left:auto">${g.perms.length} 项</span>
+        </div>
+        <div class="pg-body">
+          ${g.perms.map((p, pi) => {
+            const key = g.name + ' · ' + p;
+            return `<label class="checkbox"><input type="checkbox" class="perm-check" data-key="${UI.esc(key)}" data-gi="${gi}" data-pi="${pi}" ${permSet.has(key) ? 'checked' : ''}> ${UI.esc(p)}</label>`;
+          }).join('')}
+        </div>
+      </div>`).join('');
+    syncGroupChecks();
+    updateCount();
+    tree.querySelectorAll('.perm-check').forEach(c => c.addEventListener('change', () => {
+      if (c.checked) permSet.add(c.dataset.key); else permSet.delete(c.dataset.key);
+      syncGroupChecks();
+      updateCount();
+    }));
+    tree.querySelectorAll('.group-check').forEach(c => c.addEventListener('change', () => {
+      const gi = +c.dataset.gi;
+      DB.PERM_TREE[gi].perms.forEach(p => {
+        const key = DB.PERM_TREE[gi].name + ' · ' + p;
+        if (c.checked) permSet.add(key); else permSet.delete(key);
+      });
+      tree.querySelectorAll(`.perm-check[data-gi="${gi}"]`).forEach(x => x.checked = c.checked);
+      updateCount();
+    }));
+  }
+
+  function syncGroupChecks() {
+    tree.querySelectorAll('.group-check').forEach(c => {
+      const gi = +c.dataset.gi;
+      const checks = [...tree.querySelectorAll(`.perm-check[data-gi="${gi}"]`)];
+      const n = checks.filter(x => x.checked).length;
+      c.checked = n === checks.length;
+      c.indeterminate = n > 0 && n < checks.length;
+    });
+  }
+  function updateCount() {
+    document.getElementById('permCount').textContent = `已选 ${permSet.size} 项 / 共 25 项`;
+  }
+
+  /* ---------- 权限弹窗 ---------- */
+  function openPerm(id) {
+    const r = roles.find(x => x.id === id); if (!r) return;
+    permRoleId = id;
+    document.getElementById('permTitle').textContent = '编辑权限 - ' + r.name;
+    permSet = new Set(permListOf(r));
+    renderTree();
+    UI.open('permModal');
+  }
+
+  document.getElementById('roleGrid').addEventListener('click', async e => {
+    const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+    const r = roles.find(x => x.id === b.dataset.id); if (!r) return;
+    if (b.dataset.act === 'perm') return openPerm(r.id);
+    if (b.dataset.act === 'delete') {
+      const count = userCount(r.code);
+      if (count > 0) { UI.toast('该角色下仍有用户，无法删除', 'error'); return; }
+      const ok = await UI.confirm({
+        title: '删除角色',
+        message: `确定删除角色「${r.name}」吗？删除后不可恢复，且该角色下的权限配置将一并清除。`,
+        confirmText: '确认删除', danger: true, icon: '🗑'
+      });
+      if (!ok) return;
+      roles = roles.filter(x => x.id !== r.id);
+      save();
+      Admin.log('删除', '角色「' + r.name + '」', '删除自定义角色');
+      render();
+      UI.toast('角色已删除', 'success');
+    }
+  });
+
+  document.getElementById('permSave').onclick = () => {
+    const r = roles.find(x => x.id === permRoleId); if (!r) return;
+    const ordered = [];
+    DB.PERM_TREE.forEach(g => g.perms.forEach(p => {
+      const key = g.name + ' · ' + p;
+      if (permSet.has(key)) ordered.push(key);
+    }));
+    r.perms = ordered;
+    r.users = userCount(r.code);
+    save();
+    Admin.log('编辑', '角色「' + r.name + '」权限', `共配置 ${ordered.length} 项权限`);
+    UI.close('permModal');
+    render();
+    UI.toast(`已保存「${r.name}」的权限配置`, 'success');
+  };
+
+  render();
+})();
+</script>
+<style>
+  .role-card { cursor: pointer; transition: .16s; }
+  .role-card:hover { border-color: #c7d2fe; box-shadow: var(--shadow-sm); }
+  .role-card.disabled { cursor: default; }
+  .role-card .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .role-card .rl-foot .btn { flex: none; }
+  .pg-head .checkbox { font-weight: 700; }
+  .pg-body .checkbox { padding: 2px 0; }
+</style>
+</body>
+</html>

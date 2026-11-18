@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>题库中心 · 云枢智学</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/portal.css">
+</head>
+<body>
+
+<div id="siteHeader"></div>
+
+<section class="page-hero">
+  <div class="container-wide">
+    <div class="row-between wrap gap-16">
+      <div>
+        <h1>题库中心</h1>
+        <p class="desc">按「学科 → 阶段 → 题目」逐层浏览，选择对应阶段开始练习</p>
+      </div>
+      <div class="row gap-8">
+        <span class="badge badge-outline">共 8 个学科</span>
+        <span class="badge badge-brand" id="totalQBadge">0 道题目</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="page-body">
+  <div class="container-wide qc-layout">
+    <!-- 学科栏 -->
+    <aside class="subject-panel" id="subjectPanel">
+      <div class="sp-title">全部学科</div>
+    </aside>
+
+    <!-- 主区 -->
+    <main class="qc-main" id="qcMain"></main>
+  </div>
+</div>
+
+<div id="siteFooter"></div>
+
+<!-- 解析弹窗 -->
+<div class="modal-mask" id="analysisModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div>
+        <h3>查看解析</h3>
+        <div class="sub" id="anMeta"></div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body" id="anBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>关闭</button>
+      <button class="btn btn-primary" id="anPractice">开始练习这道题</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script>
+(function () {
+  UI.renderHeader('questions');
+  UI.renderFooter();
+  UI.bindModals();
+
+  const TOTAL = DB.ALL_QUESTIONS.length;
+  document.getElementById('totalQBadge').textContent = TOTAL + ' 道题目';
+
+  const params = new URLSearchParams(location.search);
+  const state = {
+    subjectId: params.get('subject') || DB.SUBJECTS[0].id,
+    stageId: params.get('stage') || null,
+    type: 'all',
+    diff: 'all',
+    kw: ''
+  };
+  if (!DB.SUBJECT_MAP[state.subjectId]) state.subjectId = DB.SUBJECTS[0].id;
+  if (state.stageId && !DB.STAGE_MAP[state.stageId]) state.stageId = null;
+  if (state.stageId) state.subjectId = DB.STAGE_MAP[state.stageId].subjectId;
+
+  const panel = document.getElementById('subjectPanel');
+  const main = document.getElementById('qcMain');
+
+  function renderSubjects() {
+    panel.innerHTML = '<div class="sp-title">全部学科</div>' + DB.SUBJECTS.map(s => `
+      <button class="subject-item ${s.id === state.subjectId ? 'active' : ''}" data-subject="${s.id}">
+        <span class="si-icon" style="background:${s.soft};color:${s.color}">${s.icon}</span>
+        <span class="si-name">${UI.esc(s.name)}</span>
+        <span class="si-count">${s.stages.length}</span>
+      </button>`).join('');
+    panel.querySelectorAll('.subject-item').forEach(b => b.addEventListener('click', () => {
+      state.subjectId = b.dataset.subject;
+      state.stageId = null;
+      syncUrl();
+      renderAll();
+    }));
+  }
+
+  function syncUrl() {
+    const p = new URLSearchParams();
+    p.set('subject', state.subjectId);
+    if (state.stageId) p.set('stage', state.stageId);
+    history.replaceState(null, '', 'questions.html?' + p.toString());
+  }
+
+  function renderAll() {
+    renderSubjects();
+    state.stageId ? renderQuestions() : renderStages();
+    UI.initReveal();
+  }
+
+  /* ================= 阶段列表 ================= */
+  function renderStages() {
+    const s = DB.SUBJECT_MAP[state.subjectId];
+    const total = s.stages.reduce((n, st) => n + st.questions.length, 0);
+    main.innerHTML = `
+      <div class="subject-head reveal">
+        <div class="sh-icon" style="background:${s.soft};color:${s.color}">${s.icon}</div>
+        <div style="flex:1;min-width:0">
+          <h2>${UI.esc(s.name)}</h2>
+          <div class="sh-desc">${UI.esc(s.desc)}</div>
+          <div class="sh-meta"><span>共 ${s.stages.length} 个阶段</span><span>${total} 道题目</span><span>${DB.COURSES.filter(c => c.subjectId === s.id).length} 门课程</span></div>
+        </div>
+        <a class="btn btn-outline" href="roadmap.html?subject=${s.id}">查看学习路线</a>
+      </div>
+      ${s.stages.length ? s.stages.map((st, i) => {
+        const done = Math.round(st.questions.length * (0.2 + (i % 3) * 0.18));
+        return `
+        <div class="stage-row reveal" style="transition-delay:${i * .04}s">
+          <div class="sr-icon">${st.icon}</div>
+          <div style="flex:1;min-width:0">
+            <div class="sr-name">${UI.esc(st.name)}</div>
+            <div class="sr-meta">
+              <span>共 ${st.questions.length} 题</span>
+              <span>·</span>
+              <span>练习进度 ${done}/${st.questions.length}</span>
+            </div>
+            <div class="sr-progress mt-8">
+              <div class="progress"><i style="width:${done / st.questions.length * 100}%"></i></div>
+            </div>
+          </div>
+          <div class="sr-actions">
+            <button class="btn btn-outline btn-sm" data-view="${st.id}">查看题目</button>
+            <button class="btn btn-primary btn-sm" data-practice="${st.id}">开始练习</button>
+          </div>
+        </div>`;
+      }).join('') : `<div class="empty"><div class="em-icon">📭</div><div class="em-title">该学科暂无阶段</div><div class="em-sub">题目正在录入中，敬请期待</div></div>`}
+    `;
+    main.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
+      state.stageId = b.dataset.view; state.type = 'all'; state.diff = 'all'; state.kw = '';
+      syncUrl(); renderAll();
+    }));
+    main.querySelectorAll('[data-practice]').forEach(b => b.addEventListener('click', () => {
+      location.href = `practice.html?subject=${state.subjectId}&stage=${b.dataset.practice}`;
+    }));
+  }
+
+  /* ================= 题目列表 ================= */
+  function renderQuestions() {
+    const s = DB.SUBJECT_MAP[state.subjectId];
+    const st = DB.STAGE_MAP[state.stageId];
+    const list = st.questions.filter(q =>
+      (state.type === 'all' || q.type === state.type) &&
+      (state.diff === 'all' || q.difficulty === state.diff) &&
+      (!state.kw || q.stem.toLowerCase().includes(state.kw.toLowerCase()))
+    );
+
+    main.innerHTML = `
+      <div class="qc-crumb">
+        <a href="javascript:void(0)" id="backStages">‹ 返回阶段列表</a>
+        <span style="color:var(--muted-2)">|</span>
+        <a href="javascript:void(0)" id="crumbSubject">${UI.esc(s.name)}</a>
+        <span>/</span><span>${UI.esc(st.name)}</span>
+      </div>
+      <div class="subject-head" style="margin-bottom:14px">
+        <div class="sh-icon" style="background:${s.soft};color:${s.color}">${st.icon}</div>
+        <div style="flex:1;min-width:0">
+          <h2>${UI.esc(st.name)}</h2>
+          <div class="sh-meta" style="margin-top:5px"><span>${UI.esc(s.name)}</span><span>${st.questions.length} 道题目</span></div>
+        </div>
+        <button class="btn btn-primary" id="practiceAll">开始练习本阶段</button>
+      </div>
+
+      <div class="qc-toolbar">
+        <select class="select" id="typeFilter">
+          <option value="all">全部题型</option>
+          <option value="single">单选</option>
+          <option value="multiple">多选</option>
+          <option value="judge">判断</option>
+          <option value="short">简答</option>
+        </select>
+        <select class="select" id="diffFilter">
+          <option value="all">全部难度</option>
+          <option value="easy">简单</option>
+          <option value="medium">中等</option>
+          <option value="hard">困难</option>
+        </select>
+        <div class="search">
+          <i>🔍</i>
+          <input class="input" id="kw" placeholder="搜索题目关键词" value="${UI.esc(state.kw)}" />
+        </div>
+        <span class="small muted" style="margin-left:auto">共 ${list.length} 道</span>
+      </div>
+
+      <div id="qList">
+        ${list.length ? list.map((q, i) => `
+          <div class="q-card">
+            <div class="qc-top">
+              <span class="q-no">第 ${i + 1} 题</span>
+              <span class="badge badge-brand">${UI.typeName(q.type)}</span>
+              <span class="diff diff-${q.difficulty}">● ${UI.diffName(q.difficulty)}</span>
+            </div>
+            <div class="q-stem">${UI.esc(q.stem)}</div>
+            <div class="qc-tags">${q.tags.map(t => `<span class="tag">#${UI.esc(t)}</span>`).join('')}</div>
+            <div class="qc-meta">
+              <span>${UI.esc(q.stageName)}</span>
+              <span>${q.people.toLocaleString()} 人做过</span>
+              <span>正确率 ${q.accuracy}%</span>
+              <div class="qc-actions">
+                <button class="btn btn-outline btn-sm" data-analysis="${q.id}">查看解析</button>
+                <button class="btn btn-soft btn-sm" data-single="${q.id}">开始练习</button>
+              </div>
+            </div>
+          </div>`).join('') : `
+          <div class="empty">
+            <div class="em-icon">🔍</div>
+            <div class="em-title">${st.questions.length ? '没有匹配的题目' : '该阶段暂无题目'}</div>
+            <div class="em-sub">${st.questions.length ? '试试调整筛选条件或关键词' : '题目正在录入中，敬请期待'}</div>
+          </div>`}
+      </div>
+    `;
+
+    document.getElementById('backStages').onclick = () => {
+      state.stageId = null; syncUrl(); renderAll();
+    };
+    document.getElementById('crumbSubject').onclick = () => {
+      state.stageId = null; syncUrl(); renderAll();
+    };
+    document.getElementById('practiceAll').onclick = () => {
+      location.href = `practice.html?subject=${state.subjectId}&stage=${state.stageId}`;
+    };
+    const tf = document.getElementById('typeFilter'), df = document.getElementById('diffFilter');
+    tf.value = state.type; df.value = state.diff;
+    tf.onchange = () => { state.type = tf.value; renderQuestions(); };
+    df.onchange = () => { state.diff = df.value; renderQuestions(); };
+    document.getElementById('kw').addEventListener('input', UI.debounce(e => {
+      state.kw = e.target.value.trim(); renderQuestions();
+      const el = document.getElementById('kw'); el.focus(); el.setSelectionRange(el.value.length, el.value.length);
+    }, 320));
+
+    main.querySelectorAll('[data-analysis]').forEach(b => b.addEventListener('click', () => openAnalysis(b.dataset.analysis)));
+    main.querySelectorAll('[data-single]').forEach(b => b.addEventListener('click', () => {
+      location.href = `practice.html?subject=${state.subjectId}&stage=${state.stageId}&question=${b.dataset.single}`;
+    }));
+  }
+
+  /* ================= 解析弹窗 ================= */
+  let anQid = null;
+  function openAnalysis(id) {
+    const q = DB.QUESTION_MAP[id];
+    anQid = id;
+    document.getElementById('anMeta').textContent = `${q.subjectName} / ${q.stageName} · ${UI.typeName(q.type)} · ${UI.diffName(q.difficulty)}`;
+    const answerText = q.type === 'short' ? (q.reference || '参考上述解析要点')
+      : (q.type === 'judge' ? (q.answer === 'A' ? '正确' : '错误') : UI.letterList(q.answer));
+    document.getElementById('anBody').innerHTML = `
+      <div style="font-size:15px;font-weight:650;line-height:1.7">${UI.esc(q.stem)}</div>
+      ${q.options.length ? `<div class="opt-list mt-16">${q.options.map(o => `
+        <div class="opt disabled ${(q.type === 'multiple' ? q.answer.includes(o.key) : q.answer === o.key) ? 'correct' : ''}">
+          <span class="key">${o.key}</span><span class="otext">${UI.esc(o.text)}</span>
+          ${(q.type === 'multiple' ? q.answer.includes(o.key) : q.answer === o.key) ? '<span class="mark">正确答案</span>' : ''}
+        </div>`).join('')}</div>` : ''}
+      <div class="analysis-card mt-16">
+        <div class="ac-head">📖 答案解析</div>
+        <div class="ac-body">
+          <div class="answer-line"><span class="al-label">正确答案</span><b style="color:var(--success)">${UI.esc(answerText)}</b></div>
+          <div class="analysis-text">${UI.esc(q.analysis)}</div>
+        </div>
+      </div>`;
+    UI.open('analysisModal');
+  }
+  document.getElementById('anPractice').onclick = () => {
+    const q = DB.QUESTION_MAP[anQid];
+    location.href = `practice.html?subject=${q.subjectId}&stage=${q.stageId}&question=${q.id}`;
+  };
+
+  renderAll();
+})();
+</script>
+</body>
+</html>

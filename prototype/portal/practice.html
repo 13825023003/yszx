@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>刷题练习 · 云枢智学</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/portal.css">
+</head>
+<body>
+
+<div id="siteHeader"></div>
+
+<div class="practice-shell">
+  <div class="container-wide practice-layout">
+    <!-- 左侧面板 -->
+    <aside class="practice-side" id="practiceSide"></aside>
+    <!-- 答题区 -->
+    <main class="practice-main" id="practiceMain"></main>
+  </div>
+</div>
+
+<!-- 模式选择弹窗 -->
+<div class="modal-mask" id="modeModal" data-static="1">
+  <div class="modal modal-sm">
+    <div class="modal-head">
+      <div>
+        <h3>选择练习模式</h3>
+        <div class="sub" id="modeSub"></div>
+      </div>
+      <button class="modal-x" id="modeClose">✕</button>
+    </div>
+    <div class="modal-body" style="display:grid;gap:10px">
+      <div class="mode-option active" data-mode="sequence">
+        <div class="mo-icon">📋</div>
+        <div style="flex:1"><b>顺序练习</b><span>按题库顺序逐题作答，适合系统学习</span></div>
+        <span class="radio" style="width:17px;height:17px;border-radius:50%;border:5px solid var(--brand);margin-top:2px"></span>
+      </div>
+      <div class="mode-option" data-mode="random">
+        <div class="mo-icon">🎲</div>
+        <div style="flex:1"><b>随机练习</b><span>打乱题目顺序，适合自测与热身</span></div>
+        <span class="radio" style="width:17px;height:17px;border-radius:50%;border:1.5px solid #d0d5dd;margin-top:2px"></span>
+      </div>
+      <div class="hint" style="margin-top:2px">选择模式后立即开始计时，练习进度会保存在本地。</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" id="modeCancel">取消</button>
+      <button class="btn btn-primary" id="modeStart">开始练习</button>
+    </div>
+  </div>
+</div>
+
+<!-- 继续练习弹窗 -->
+<div class="modal-mask" id="resumeModal" data-static="1">
+  <div class="modal modal-sm">
+    <div class="modal-head">
+      <div>
+        <h3>检测到未完成的练习</h3>
+        <div class="sub">是否继续上次的练习进度？</div>
+      </div>
+      <button class="modal-x" id="resumeClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="padding:14px 16px;border-radius:11px;background:#f8f9fd;border:1px solid var(--line)">
+        <div style="font-weight:700;font-size:13.5px" id="resumeTitle"></div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:6px" id="resumeMeta"></div>
+      </div>
+      <div class="hint mt-12">选择「重新开始」将清空本题库的练习进度并重新选择练习模式。</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" id="resumeRestart">重新开始</button>
+      <button class="btn btn-primary" id="resumeContinue">继续练习</button>
+    </div>
+  </div>
+</div>
+
+<!-- 快捷键 -->
+<div class="modal-mask" id="shortcutModal">
+  <div class="modal modal-sm">
+    <div class="modal-head">
+      <div><h3>键盘快捷键</h3><div class="sub">熟练后可以全程不用鼠标</div></div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;gap:14px;font-size:13px">
+        <div class="row-between"><span class="muted">上一题</span><span class="kbd">←</span></div>
+        <div class="row-between"><span class="muted">下一题</span><span class="kbd">→</span></div>
+        <div class="row-between"><span class="muted">提交答案 / 下一题</span><span class="kbd">Enter</span></div>
+        <div class="row-between"><span class="muted">显示本面板</span><span class="kbd">?</span></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-outline" data-close>知道了</button></div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script>
+(function () {
+  const user = UI.requireUser();
+  if (!user) return;
+  UI.renderHeader('questions');
+  UI.bindModals();
+
+  const params = new URLSearchParams(location.search);
+  const stageId = params.get('stage') || 'agent-1';
+  const subjectId = params.get('subject') || (DB.STAGE_MAP[stageId] || {}).subjectId || 'agent';
+  const singleQ = params.get('question');
+  const presetMode = params.get('mode');
+  const stage = DB.STAGE_MAP[stageId] || DB.SUBJECTS[0].stages[0];
+  const subject = DB.SUBJECT_MAP[stage.subjectId] || DB.SUBJECTS[0];
+  const pool = singleQ && DB.QUESTION_MAP[singleQ] ? [DB.QUESTION_MAP[singleQ]] : stage.questions;
+  const backUrl = `questions.html?subject=${stage.subjectId}&stage=${stage.id}`;
+  const SESSION_KEY = 'practice_session';
+
+  let session = UI.Store.get(SESSION_KEY, null);
+  let timer = null;
+  let mode = presetMode === 'random' ? 'random' : 'sequence';
+  let selectedMode = mode;
+  let grading = false;
+
+  /* ---------------- 初始化 ---------------- */
+  const savedValid = session && session.stageId === stage.id &&
+    Array.isArray(session.questionIds) && session.questionIds.every(id => DB.QUESTION_MAP[id]);
+
+  if (savedValid) {
+    showResume();
+  } else {
+    if (session) UI.Store.remove(SESSION_KEY);
+    session = null;
+    showMode();
+  }
+
+  function showMode() {
+    document.getElementById('modeSub').textContent = `${stage.name} · 共 ${pool.length} 题`;
+    document.querySelectorAll('#modeModal .mode-option').forEach(o => {
+      const on = o.dataset.mode === selectedMode;
+      o.classList.toggle('active', on);
+      const radio = o.querySelector('.radio');
+      radio.style.border = on ? '5px solid var(--brand)' : '1.5px solid #d0d5dd';
+      radio.style.width = '17px'; radio.style.height = '17px'; radio.style.borderRadius = '50%';
+    });
+    UI.open('modeModal');
+  }
+
+  document.querySelectorAll('#modeModal .mode-option').forEach(o => {
+    o.addEventListener('click', () => { selectedMode = o.dataset.mode; showMode(); });
+  });
+  function cancelPractice() {
+    UI.close('modeModal');
+    setTimeout(() => location.href = backUrl, 180);
+  }
+  document.getElementById('modeClose').onclick = cancelPractice;
+  document.getElementById('modeCancel').onclick = cancelPractice;
+  document.getElementById('modeStart').onclick = () => {
+    UI.close('modeModal');
+    startSession(selectedMode);
+  };
+
+  function startSession(m) {
+    mode = m;
+    let ids = pool.map(q => q.id);
+    if (m === 'random') ids = shuffle(ids.slice());
+    session = {
+      stageId: stage.id, subjectId: stage.subjectId, stageName: stage.name,
+      mode: m, questionIds: ids, current: 0,
+      answers: {}, graded: {}, elapsed: 0, savedAt: Date.now()
+    };
+    save();
+    render();
+    startTimer();
+    UI.toast(m === 'random' ? '随机练习已开始，加油！' : '顺序练习已开始，加油！', 'success');
+  }
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+
+  /* ---------------- 继续上次 ---------------- */
+  function showResume() {
+    const done = Object.keys(session.graded || {}).length;
+    document.getElementById('resumeTitle').textContent = session.stageName + ' · ' + (session.mode === 'random' ? '随机练习' : '顺序练习');
+    document.getElementById('resumeMeta').textContent = `已完成 ${done}/${session.questionIds.length} 题 · 用时 ${UI.fmtSec(session.elapsed || 0)} · 上次练习于 ${new Date(session.savedAt).toLocaleString('zh-CN', { hour12: false })}`;
+    UI.open('resumeModal');
+  }
+  document.getElementById('resumeContinue').onclick = () => {
+    UI.close('resumeModal');
+    mode = session.mode;
+    render(); startTimer();
+    UI.toast('已恢复上次练习进度', 'success');
+  };
+  document.getElementById('resumeRestart').onclick = async () => {
+    UI.close('resumeModal');
+    const ok = await UI.confirm({ title: '重新开始练习', message: '将清空已保存的练习进度，并重新选择练习模式。', confirmText: '重新开始', danger: true, icon: '↻' });
+    if (!ok) { showResume(); return; }
+    UI.Store.remove(SESSION_KEY); session = null;
+    setTimeout(() => { if (session) return; selectedMode = 'sequence'; showMode(); }, 200);
+  };
+  document.getElementById('resumeClose').onclick = () => { UI.close('resumeModal'); showResume(); };
+
+  /* ---------------- 计时 ---------------- */
+  function startTimer() {
+    clearInterval(timer);
+    updateTimerDom();
+    timer = setInterval(() => {
+      session.elapsed++;
+      if (session.elapsed % 5 === 0) save();
+      updateTimerDom();
+    }, 1000);
+  }
+  function updateTimerDom() {
+    const el = document.getElementById('timerVal');
+    if (el) el.textContent = UI.fmtSec(session ? session.elapsed : 0);
+  }
+  function save() { if (session) { session.savedAt = Date.now(); UI.Store.set(SESSION_KEY, session); } }
+
+  /* ---------------- 渲染 ---------------- */
+  function curQ() { return DB.QUESTION_MAP[session.questionIds[session.current]]; }
+
+  function render() {
+    if (!session) return;
+    const q = curQ();
+    const total = session.questionIds.length;
+    const idx = session.current;
+    const answer = session.answers[q.id];
+    const graded = session.graded[q.id];
+    const progressPct = Math.round((idx + 1) / total * 100);
+
+    document.getElementById('practiceSide').innerHTML = `
+      <a class="ps-back" href="${backUrl}">‹ 返回题库</a>
+      <div class="ps-title">${UI.esc(session.stageName)}</div>
+      <div class="ps-sub">${subject.icon} ${UI.esc(subject.name)} · ${session.mode === 'random' ? '随机练习' : '顺序练习'}</div>
+      <div class="ps-progress-label"><span>练习进度</span><b>${idx + 1} / ${total}</b></div>
+      <div class="progress"><i style="width:${progressPct}%"></i></div>
+      <div class="timer-box">
+        <div><div class="tm-label">本次用时</div><div class="tm" id="timerVal">${UI.fmtSec(session.elapsed)}</div></div>
+        <span style="font-size:22px">⏱</span>
+      </div>
+      <div class="row-between mt-16">
+        <span class="title-sm" style="font-size:12.5px">答题卡</span>
+        <span class="small muted">已答 ${Object.keys(session.graded).length}/${total}</span>
+      </div>
+      <div class="answer-grid" id="answerGrid">
+        ${session.questionIds.map((id, i) => {
+          const g = session.graded[id];
+          let cls = '';
+          if (g) cls = g.correct ? 'right' : 'wrong';
+          if (i === idx) cls += ' cur';
+          return `<button class="${cls}" data-jump="${i}" title="第 ${i + 1} 题">${i + 1}</button>`;
+        }).join('')}
+      </div>
+      <div class="answer-legend">
+        <span><i style="background:#fff;border:1px solid #e4e7ec"></i>未作答</span>
+        <span><i style="background:#4f46e5"></i>当前题</span>
+        <span><i style="background:#12b76a"></i>正确</span>
+        <span><i style="background:#f04438"></i>错误</span>
+      </div>
+      <button class="btn btn-outline btn-block mt-16" id="endBtn" style="color:var(--danger);border-color:#fecdca">结束练习</button>
+      <div class="center mt-8"><button class="link small" id="shortcutHelp" style="background:none">快捷键说明（?）</button></div>
+    `;
+
+    document.querySelectorAll('#answerGrid [data-jump]').forEach(b => {
+      b.onclick = () => jumpTo(+b.dataset.jump);
+    });
+    document.getElementById('endBtn').onclick = requestEnd;
+    document.getElementById('shortcutHelp').onclick = () => UI.open('shortcutModal');
+
+    const isShort = q.type === 'short';
+    const answerText = isShort ? (answer || '') : '';
+    const answerLabel = q.type === 'judge' ? (k => k === 'A' ? '正确' : '错误')
+      : (k => k);
+    const correctKeys = q.type === 'multiple' ? q.answer : [q.answer];
+
+    let optionsHtml = '';
+    if (!isShort) {
+      optionsHtml = `<div class="opt-list">${q.options.map(o => {
+        let cls = 'opt';
+        const picked = Array.isArray(answer) ? answer.includes(o.key) : answer === o.key;
+        if (graded) {
+          cls += ' disabled';
+          if (correctKeys.includes(o.key)) cls += ' correct';
+          else if (picked) cls += ' wrong';
+        } else if (picked) cls += ' selected';
+        let mark = '';
+        if (graded) {
+          if (correctKeys.includes(o.key)) mark = '<span class="mark">正确答案</span>';
+          else if (picked) mark = '<span class="mark">你的选择</span>';
+        }
+        return `<div class="${cls}" data-opt="${o.key}">
+          <span class="key">${o.key}</span>
+          <span class="otext">${UI.esc(o.text)}</span>${mark}
+        </div>`;
+      }).join('')}</div>`;
+    } else {
+      optionsHtml = `
+        <textarea class="textarea short-input" id="shortInput" placeholder="请写下你的回答……建议分点作答，涵盖关键概念与实际案例" ${graded ? 'disabled' : ''}>${UI.esc(answerText)}</textarea>
+        <div class="row-between mt-8">
+          <span class="hint">${graded ? '本题已提交批改，不可修改' : '简答题由 AI 按关键点评分，≥6 分视为通过'}</span>
+          <span class="hint" id="shortCount">${answerText.length} 字</span>
+        </div>`;
+    }
+
+    const resultBadge = graded
+      ? (q.type === 'short'
+        ? `<span class="badge ${graded.correct ? 'badge-success' : 'badge-danger'}">${graded.correct ? '回答通过' : '回答未通过'} · ${graded.score}/10 分</span>`
+        : `<span class="badge ${graded.correct ? 'badge-success' : 'badge-danger'}">${graded.correct ? '回答正确' : '回答错误'}</span>`)
+      : '<span class="badge badge-gray">未作答</span>';
+
+    const correctAnswerText = isShort ? '参考解析中的参考答案'
+      : correctKeys.map(k => answerLabel(k)).join('、');
+
+    document.getElementById('practiceMain').innerHTML = `
+      <div class="practice-head">
+        <span class="badge badge-brand">${UI.typeName(q.type)}</span>
+        <span class="diff diff-${q.difficulty}">● ${UI.diffName(q.difficulty)}</span>
+        ${q.type === 'multiple' ? '<span class="tag">多选题 · 可选择多个选项</span>' : ''}
+        <span class="spacer" style="flex:1"></span>
+        <span class="small muted">第 ${idx + 1} / ${total} 题</span>
+      </div>
+      <div class="practice-body">
+        <div class="practice-stem">${UI.esc(q.stem)}</div>
+        ${optionsHtml}
+        <div id="gradeArea">${renderGradeArea(q, graded)}</div>
+      </div>
+      <div class="practice-foot">
+        <button class="btn btn-outline" id="prevBtn" ${idx === 0 ? 'disabled' : ''}>‹ 上一题</button>
+        <button class="btn btn-ghost" id="analysisBtn" ${graded ? '' : 'disabled'}>查看解析</button>
+        <span class="spacer"></span>
+        ${graded
+          ? `<button class="btn btn-primary" id="nextBtn">${idx === total - 1 ? '完成' : '下一题 →'}</button>`
+          : `<button class="btn btn-primary" id="submitBtn" ${canSubmit(q, answer) ? '' : 'disabled'}>提交答案</button>`}
+      </div>
+    `;
+
+    /* 选项交互 */
+    document.querySelectorAll('[data-opt]').forEach(el => {
+      el.onclick = () => {
+        if (session.graded[q.id]) return;
+        const k = el.dataset.opt;
+        if (q.type === 'multiple') {
+          let arr = Array.isArray(session.answers[q.id]) ? session.answers[q.id].slice() : [];
+          arr.includes(k) ? arr = arr.filter(x => x !== k) : arr.push(k);
+          session.answers[q.id] = arr.sort();
+        } else {
+          session.answers[q.id] = k;
+        }
+        save();
+        const shouldKeepScroll = window.scrollY;
+        render();
+        window.scrollTo(0, shouldKeepScroll);
+      };
+    });
+
+    /* 简答输入 */
+    const si = document.getElementById('shortInput');
+    if (si) {
+      si.addEventListener('input', () => {
+        session.answers[q.id] = si.value;
+        document.getElementById('shortCount').textContent = si.value.length + ' 字';
+        const btn = document.getElementById('submitBtn');
+        if (btn) btn.disabled = si.value.trim().length === 0;
+        save();
+      });
+    }
+
+    /* 底部按钮 */
+    document.getElementById('prevBtn').onclick = () => navigate(-1);
+    const nextBtn = document.getElementById('nextBtn');
+    if (nextBtn) nextBtn.onclick = () => { if (idx === total - 1) requestEnd(); else navigate(1); };
+    const submitBtn = document.getElementById('submitBtn');
+    if (submitBtn) submitBtn.onclick = submitCurrent;
+    const anBtn = document.getElementById('analysisBtn');
+    if (anBtn) anBtn.onclick = () => {
+      if (!session.graded[q.id]) { UI.toast('提交答案后才能查看解析', 'warn'); return; }
+      document.getElementById('gradeArea').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const card = document.querySelector('#gradeArea .analysis-card');
+      if (card) { card.style.boxShadow = '0 0 0 3px rgba(79,70,229,.16)'; setTimeout(() => card.style.boxShadow = '', 1200); }
+    };
+  }
+
+  function renderGradeArea(q, graded) {
+    if (!graded) return '';
+    if (q.type === 'short') {
+      return scoreCard(q, graded) + analysisCard(q, true);
+    }
+    return analysisCard(q, graded.correct);
+  }
+
+  function scoreCard(q, graded) {
+    const color = UI.scoreColor(graded.score);
+    const soft = UI.scoreSoft(graded.score);
+    const kps = q.keyPoints || [];
+    const covered = graded.covered || [];
+    return `
+      <div class="score-card">
+        <div class="sc-top">
+          <div class="score-ring" style="background:${soft};color:${color}">
+            <b>${graded.score}</b><span>/ 10 分</span>
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:${color};margin-bottom:4px">${graded.correct ? '✓ 通过（≥6 分）' : '✕ 未通过（<6 分）'}</div>
+            <div class="sc-comment">${UI.esc(graded.comment)}</div>
+          </div>
+        </div>
+        <div class="sc-body">
+          <div class="sc-sec">
+            <h5>关键点覆盖</h5>
+            ${kps.map((k, i) => `<div class="kp"><i style="color:${covered.includes(k) ? 'var(--success)' : 'var(--muted-2)'}">${covered.includes(k) ? '✓' : '○'}</i><span>${UI.esc(k)}</span></div>`).join('')}
+          </div>
+          <div class="sc-sec">
+            <h5>参考答案</h5>
+            <div style="font-size:13px;color:var(--text-2);line-height:1.8">${UI.esc(q.reference || q.analysis)}</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function analysisCard(q, correct) {
+    const answerText = q.type === 'judge' ? (q.answer === 'A' ? '正确' : '错误')
+      : q.type === 'multiple' ? UI.letterList(q.answer) : q.type === 'single' ? q.answer : '';
+    const your = session.answers[q.id];
+    const yourText = q.type === 'short' ? '见上方评分' :
+      q.type === 'judge' ? (your === 'A' ? '正确' : your === 'B' ? '错误' : '未作答') :
+      Array.isArray(your) ? UI.letterList(your) : (your || '未作答');
+    return `
+      <div class="analysis-card">
+        <div class="ac-head">
+          ${correct ? '<span style="color:var(--success)">✓</span> 回答正确' : '<span style="color:var(--danger)">✕</span> 回答错误'}
+          <span class="badge ${correct ? 'badge-success' : 'badge-danger'}" style="margin-left:auto">${correct ? '已掌握' : '建议加入错题本'}</span>
+        </div>
+        <div class="ac-body">
+          <div class="answer-line"><span class="al-label">正确答案</span><b style="color:var(--success)">${answerText}</b></div>
+          ${q.type !== 'short' ? `<div class="answer-line"><span class="al-label">你的答案</span><b style="color:${correct ? 'var(--success)' : 'var(--danger)'}">${yourText}</b></div>` : ''}
+          <div class="analysis-text">${UI.esc(q.analysis)}</div>
+        </div>
+      </div>`;
+  }
+
+  /* ---------------- 作答 ---------------- */
+  function canSubmit(q, answer) {
+    if (q.type === 'short') return !!(answer && answer.trim().length);
+    if (q.type === 'multiple') return Array.isArray(answer) && answer.length > 0;
+    return !!answer;
+  }
+
+  function submitCurrent() {
+    if (grading) return;
+    const q = curQ();
+    if (session.graded[q.id]) return;
+    const answer = session.answers[q.id];
+    if (!canSubmit(q, answer)) { UI.toast('请先作答再提交', 'warn'); return; }
+
+    if (q.type === 'short') {
+      grading = true;
+      const area = document.getElementById('gradeArea');
+      const sb = document.getElementById('submitBtn');
+      if (sb) sb.disabled = true;
+      area.innerHTML = `<div class="ai-grading"><div class="spinner"></div><div><div class="gt">AI 正在分析你的作答…</div><div class="gs">正在提取关键点并匹配评分标准</div></div></div>`;
+      setTimeout(() => {
+        area.innerHTML = `<div class="ai-grading"><div class="spinner"></div><div><div class="gt">AI 评分中…</div><div class="gs">正在生成评语与改进建议</div></div></div>`;
+      }, 900);
+      setTimeout(() => {
+        const result = gradeShort(q, answer);
+        session.graded[q.id] = result;
+        grading = false;
+        save();
+        render();
+        document.querySelector('#gradeArea .score-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 1900);
+      return;
+    }
+
+    const correctKeys = q.type === 'multiple' ? q.answer : [q.answer];
+    const picked = q.type === 'multiple' ? answer : [answer];
+    const correct = correctKeys.length === picked.length && correctKeys.every(k => picked.includes(k));
+    session.graded[q.id] = { correct };
+    save();
+    render();
+    if (correct) UI.toast('回答正确', 'success');
+    else UI.toast('回答错误，已记录到错题本', 'error');
+  }
+
+  function gradeShort(q, text) {
+    const kps = q.keyPoints || [];
+    const covered = kps.filter(k => text.includes(k));
+    const lenScore = Math.min(4, Math.floor(text.trim().length / 40));
+    const pointScore = Math.round(covered.length / Math.max(1, kps.length) * 5);
+    let score = Math.max(2, Math.min(10, 2 + lenScore + pointScore));
+    if (text.trim().length < 12) score = Math.min(score, 4);
+    const correct = score >= 6;
+    const comment = score >= 8
+      ? '回答结构完整，覆盖了大部分关键点，表达清晰。建议补充具体的项目案例与量化结果，会更有说服力。'
+      : score >= 6
+        ? '回答基本覆盖核心要点，可以再补充关键细节与权衡过程。尝试使用「结论 → 展开 → 举例」的结构。'
+        : '回答覆盖的关键点较少，建议先梳理知识框架再作答。可结合参考答案补充遗漏的要点。';
+    return { correct, score, comment, covered, gradedAt: Date.now() };
+  }
+
+  /* ---------------- 导航 ---------------- */
+  function navigate(delta) {
+    const q = curQ();
+    if (delta > 0 && q.type === 'short' && !session.graded[q.id]) {
+      UI.toast('请先提交本题的简答答案，才能进入下一题', 'warn');
+      return;
+    }
+    const nextIdx = session.current + delta;
+    if (nextIdx < 0 || nextIdx >= session.questionIds.length) return;
+    session.current = nextIdx;
+    save();
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function jumpTo(index) {
+    const q = curQ();
+    if (index > session.current && q.type === 'short' && !session.graded[q.id]) {
+      UI.toast('请先提交本题的简答答案，才能切换到后续题目', 'warn');
+      return;
+    }
+    session.current = index;
+    save();
+    render();
+  }
+
+  /* ---------------- 结束练习 ---------------- */
+  function requestEnd() {
+    const total = session.questionIds.length;
+    const pendingShortIdx = session.questionIds.findIndex(id => {
+      const q = DB.QUESTION_MAP[id];
+      return q.type === 'short' && !session.graded[id];
+    });
+    if (pendingShortIdx > -1) {
+      const ok = confirm('存在未提交的简答题，是否前往作答？');
+      if (ok) { session.current = pendingShortIdx; save(); render(); }
+      return;
+    }
+    const done = Object.keys(session.graded).length;
+    const rest = total - done;
+    UI.confirm({
+      title: '结束本次练习',
+      message: rest > 0
+        ? `还有 ${rest} 道题未完成，结束后本次练习进度将被清除并返回题库中心。`
+        : '本次练习已全部完成，结束后将停止计时并返回题库中心。',
+      confirmText: '结束练习', cancelText: '继续练习', danger: true, icon: '⏹'
+    }).then(ok => {
+      if (!ok) return;
+      clearInterval(timer);
+      UI.Store.remove(SESSION_KEY);
+      session = null;
+      UI.toast('本次练习已结束', 'success');
+      setTimeout(() => location.href = backUrl, 400);
+    });
+  }
+
+  /* ---------------- 键盘 ---------------- */
+  document.addEventListener('keydown', e => {
+    const tag = (document.activeElement.tagName || '').toLowerCase();
+    const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+    if (document.querySelector('.modal-mask.open')) {
+      if (e.key === 'Escape') {
+        const openMask = document.querySelector('.modal-mask.open');
+        if (openMask.id === 'modeModal') cancelPractice();
+        else UI.close(openMask);
+      }
+      return;
+    }
+    if (!session) return;
+    if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+      if (!typing) { e.preventDefault(); UI.open('shortcutModal'); }
+      return;
+    }
+    if (e.key === 'ArrowLeft' && !typing) { e.preventDefault(); navigate(-1); }
+    if (e.key === 'ArrowRight' && !typing) { e.preventDefault(); if (session.graded[curQ().id]) navigate(1); }
+    if (e.key === 'Enter') {
+      if (typing) return;
+      e.preventDefault();
+      const q = curQ();
+      if (session.graded[q.id]) {
+        if (session.current === session.questionIds.length - 1) requestEnd();
+        else navigate(1);
+      } else {
+        submitCurrent();
+      }
+    }
+  });
+
+  /* 离开页面时保存 */
+  window.addEventListener('beforeunload', save);
+
+  /* 快捷键面板内 Enter 也正常 */
+  document.getElementById('shortcutModal').addEventListener('keydown', e => e.stopPropagation());
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+# ============================================================================
+# 生产环境配置
+# 所有连接信息与密钥必须通过环境变量提供（无默认值，缺失即启动失败）。
+# 密钥不得写入代码仓库或数据库（02 §2.4、§4.7）。
+# ============================================================================
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:yszx}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectionTimeZone=UTC
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASSWORD}
+    hikari:
+      pool-name: yszx-hikari
+      minimum-idle: 10
+      maximum-pool-size: 30
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      timeout: 3s
+      lettuce:
+        shutdown-timeout: 200ms
+
+app:
+  jwt:
+    portal:
+      secret: ${JWT_PORTAL_SECRET}
+    admin:
+      secret: ${JWT_ADMIN_SECRET}
+  storage:
+    endpoint: ${MINIO_ENDPOINT}
+    access-key: ${MINIO_ACCESS_KEY}
+    secret-key: ${MINIO_SECRET_KEY}
+  ai:
+    base-url: ${AI_BASE_URL}
+    api-key: ${AI_API_KEY}
+    model: ${AI_MODEL}
+
+logging:
+  level:
+    root: INFO
+    com.yunshu.zhixue: INFO

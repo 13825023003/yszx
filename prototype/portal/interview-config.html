@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 模拟面试 · 云枢智学</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/portal.css">
+</head>
+<body>
+
+<div id="siteHeader"></div>
+
+<section class="page-hero">
+  <div class="container-wide">
+    <div class="row gap-12">
+      <span class="eyebrow">AI INTERVIEW</span>
+      <span class="badge badge-outline">每日限额 5 次</span>
+    </div>
+    <h1 class="mt-12">开始一场 AI 模拟面试</h1>
+    <p class="desc">选择方向与难度，AI 面试官将逐题提问、实时评分，并在结束后生成能力报告</p>
+  </div>
+</section>
+
+<div class="page-body">
+  <div class="container-wide iv-config-layout">
+    <div class="config-card">
+      <!-- 技术方向 -->
+      <div class="cfg-block">
+        <div class="row-between">
+          <div class="cfg-title"><span class="no">1</span>技术方向</div>
+          <span class="small muted">单选 · 已选 <b id="dirPick" style="color:var(--brand)">AI应用与智能体开发</b></span>
+        </div>
+        <div class="cfg-desc">选择你最想检验的技术方向，题目会围绕该方向的能力模型展开</div>
+        <div class="dir-grid" id="dirGrid"></div>
+      </div>
+
+      <!-- 难度 -->
+      <div class="cfg-block">
+        <div class="cfg-title"><span class="no">2</span>面试难度</div>
+        <div class="cfg-desc">难度会影响题目的深度、追问强度与评分标准</div>
+        <div class="diff-list" id="diffList">
+          <div class="diff-opt" data-diff="easy">
+            <b><span style="color:#12b76a">●</span> 简单</b>
+            <span>基础面试 · 适合初次体验、查漏补缺</span>
+          </div>
+          <div class="diff-opt active" data-diff="medium">
+            <b><span style="color:#f79009">●</span> 中等</b>
+            <span>进阶面试 · 适合有一定项目经验</span>
+          </div>
+          <div class="diff-opt" data-diff="hard">
+            <b><span style="color:#f04438">●</span> 困难</b>
+            <span>高级面试 · 深挖原理与架构权衡</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 题量 & 超时 -->
+      <div class="cfg-block">
+        <div class="cfg-title"><span class="no">3</span>面试设置</div>
+        <div class="cfg-desc">题目数量越多，面试时长越长；每题回答超时时间为固定值</div>
+        <div class="form-grid cols-2">
+          <div class="field">
+            <label>面试题目数量</label>
+            <select class="select" id="countSelect" style="height:42px">
+              <option value="3">3 题 · 快速体验（约 5 分钟）</option>
+              <option value="5">5 题 · 精简面试（约 10 分钟）</option>
+              <option value="8">8 题 · 标准面试（约 15 分钟）</option>
+              <option value="10" selected>10 题 · 完整面试（约 20 分钟）</option>
+              <option value="15">15 题 · 深度面试（约 30 分钟）</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>回答超时时间</label>
+            <input class="input" value="5 分钟 / 题（固定，不可修改）" disabled style="height:42px" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 配额说明 -->
+      <div class="cfg-block" style="margin-bottom:0">
+        <div class="row-between wrap gap-12">
+          <div>
+            <div class="row gap-8" style="font-size:12.5px;color:var(--muted)">
+              <span>🕛 每日 0 点重置额度</span>
+              <span>·</span>
+              <span>⚠️ 面试过程中退出会保存进度，可再次进入继续</span>
+            </div>
+          </div>
+          <button class="btn btn-grad btn-lg" id="startBtn">开始 AI 面试 <span style="opacity:.75">→</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧配额 -->
+    <aside class="quota-card">
+      <div class="row-between">
+        <span class="title-sm">今日面试额度</span>
+        <span class="badge badge-brand" id="quotaBadge">剩余 3 次</span>
+      </div>
+      <div class="quota-ring" id="quotaRing">
+        <div class="qr-inner"><b id="quotaNum">3</b><span>剩余次数 / 5</span></div>
+      </div>
+      <div class="center small muted" id="quotaNote">每日限额 5 次，次日 0 点重置</div>
+
+      <div class="divider"></div>
+
+      <div class="iv-summary">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.04em;margin-bottom:2px">本次面试</div>
+        <div class="row-i"><span>技术方向</span><b id="sumDir">AI应用与智能体开发</b></div>
+        <div class="row-i"><span>面试难度</span><b id="sumDiff">中等 · 进阶面试</b></div>
+        <div class="row-i"><span>题目数量</span><b id="sumCount">10 题</b></div>
+        <div class="row-i"><span>作答超时</span><b>5 分钟 / 题</b></div>
+        <div class="row-i"><span>预计时长</span><b id="sumTime">约 20 分钟</b></div>
+      </div>
+
+      <div style="padding:12px 14px;border-radius:11px;background:#f8f9fd;border:1px solid var(--line);font-size:11.5px;color:var(--muted);line-height:1.75">
+        💡 建议在安静环境下作答，并使用语音输入可以更自然地表达。
+      </div>
+
+      <a class="btn btn-outline btn-block mt-16" href="interview-records.html">查看历史面试记录</a>
+      <div id="resumeTip" class="mt-12" style="display:none">
+        <div style="padding:12px 14px;border-radius:11px;background:var(--warn-soft);border:1px solid #fedf89;font-size:12px;color:#93370d;line-height:1.7">
+          检测到一场未完成的面试，<a class="link" href="interview.html" style="color:#b54708">继续上次面试 →</a>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div id="siteFooter"></div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script>
+(function () {
+  if (!UI.requireUser()) return;
+  UI.renderHeader('interview');
+  UI.renderFooter();
+
+  const QUOTA_TOTAL = 5;
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  /* ---------- 配额 ---------- */
+  function getQuota() {
+    let q = UI.Store.get('iv_quota', null);
+    if (!q || q.date !== todayStr) { q = { date: todayStr, used: 2 }; UI.Store.set('iv_quota', q); }
+    return q;
+  }
+  const quota = getQuota();
+  const remain = Math.max(0, QUOTA_TOTAL - quota.used);
+
+  function renderQuota() {
+    const r = Math.max(0, QUOTA_TOTAL - getQuota().used);
+    document.getElementById('quotaNum').textContent = r;
+    document.getElementById('quotaBadge').textContent = r > 0 ? `剩余 ${r} 次` : '今日额度已用完';
+    document.getElementById('quotaBadge').className = 'badge ' + (r > 0 ? 'badge-brand' : 'badge-danger');
+    document.getElementById('quotaNote').textContent = r > 0 ? '每日限额 5 次，次日 0 点重置' : '今日面试次数已用尽，次日 0 点重置';
+    const pct = r / QUOTA_TOTAL;
+    document.getElementById('quotaRing').innerHTML = `
+      ${UI.ringSvg(pct * 100, 132, 10, { color: r > 0 ? '#4f46e5' : '#f04438' })}
+      <div class="qr-inner" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <b style="font-size:30px;font-weight:850;line-height:1">${r}</b>
+        <span style="font-size:11px;color:var(--muted)">剩余次数 / 5</span>
+      </div>`;
+    document.getElementById('quotaRing').style.position = 'relative';
+    const btn = document.getElementById('startBtn');
+    btn.disabled = r <= 0;
+    if (r <= 0) btn.textContent = '今日额度已用完';
+  }
+
+  /* ---------- 选项状态 ---------- */
+  const preSubject = new URLSearchParams(location.search).get('subject');
+  const config = { subjectId: DB.SUBJECT_MAP[preSubject] ? preSubject : 'agent', difficulty: 'medium', count: 10 };
+  const DIFF_NAME = { easy: '简单 · 基础面试', medium: '中等 · 进阶面试', hard: '困难 · 高级面试' };
+
+  function renderDirections() {
+    document.getElementById('dirGrid').innerHTML = DB.DIRECTIONS.map(d => `
+      <div class="dir-card ${d.id === config.subjectId ? 'active' : ''}" data-dir="${d.id}">
+        <div class="dc-icon" style="background:${d.soft};color:${d.color}">${d.icon}</div>
+        <b>${UI.esc(d.name)}</b>
+      </div>`).join('');
+    document.querySelectorAll('[data-dir]').forEach(el => el.addEventListener('click', () => {
+      config.subjectId = el.dataset.dir;
+      renderDirections(); syncSummary();
+    }));
+  }
+  document.getElementById('diffList').addEventListener('click', e => {
+    const el = e.target.closest('[data-diff]'); if (!el) return;
+    config.difficulty = el.dataset.diff;
+    document.querySelectorAll('#diffList [data-diff]').forEach(x => x.classList.toggle('active', x === el));
+    syncSummary();
+  });
+  document.getElementById('countSelect').addEventListener('change', e => {
+    config.count = +e.target.value; syncSummary();
+  });
+
+  function syncSummary() {
+    const d = DB.SUBJECT_MAP[config.subjectId];
+    document.getElementById('dirPick').textContent = d.name;
+    document.getElementById('sumDir').textContent = d.name;
+    document.getElementById('sumDiff').textContent = DIFF_NAME[config.difficulty];
+    document.getElementById('sumCount').textContent = config.count + ' 题';
+    const totalMin = Math.round(config.count * 2);
+    document.getElementById('sumTime').textContent = `约 ${totalMin} 分钟`;
+  }
+
+  /* ---------- 未完成会话提示 ---------- */
+  const oldSession = UI.Store.get('interview_session', null);
+  if (oldSession && !oldSession.finished) {
+    const tip = document.getElementById('resumeTip');
+    tip.style.display = '';
+    tip.querySelector('a').textContent = `继续上次面试（已完成 ${Object.keys(oldSession.scores || {}).length}/${oldSession.questionCount} 题）→`;
+  }
+
+  /* ---------- 开始 ---------- */
+  document.getElementById('startBtn').addEventListener('click', async () => {
+    const q = getQuota();
+    if (QUOTA_TOTAL - q.used <= 0) { UI.toast('今日 AI 面试次数已用尽，次日 0 点重置', 'warn'); return; }
+
+    const active = UI.Store.get('interview_session', null);
+    if (active && !active.finished) {
+      const ok = await UI.confirm({
+        title: '重新开始面试',
+        message: '检测到上一场面试尚未完成。开始新面试将清除上次的答题进度，是否继续？',
+        confirmText: '清除并开始', cancelText: '返回继续上次', danger: true, icon: '⚠'
+      });
+      if (!ok) { location.href = 'interview.html'; return; }
+      UI.Store.remove('interview_session');
+    }
+
+    q.used++;
+    UI.Store.set('iv_quota', q);
+    UI.Store.set('iv_config', { subjectId: config.subjectId, difficulty: config.difficulty, count: config.count, startedAt: Date.now() });
+
+    const btn = document.getElementById('startBtn');
+    btn.disabled = true;
+    btn.textContent = '正在准备面试…';
+    setTimeout(() => location.href = 'interview.html?new=1', 550);
+  });
+
+  renderDirections();
+  renderQuota();
+  syncSummary();
+})();
+</script>
+</body>
+</html>

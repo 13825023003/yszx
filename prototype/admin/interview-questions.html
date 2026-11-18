@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>面试题库管理 · 云枢智学管理端</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+  <div id="adminAsideMount"></div>
+  <div class="admin-main">
+    <div id="adminTopbarMount"></div>
+    <main class="admin-content">
+
+      <div class="page-head">
+        <div>
+          <h1>面试题库管理</h1>
+          <div class="desc">跨知识库的面试题总览，题干与参考答案只读，仅可维护主题与难度</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-outline btn-sm" id="mdImportBtn" data-perm="import">⇪ 手动导入</button>
+          <button class="btn btn-primary btn-sm" id="entryBtn" data-perm="create">+ 录入题目</button>
+        </div>
+      </div>
+
+      <div class="a-card">
+        <div class="a-toolbar">
+          <div class="search"><i>🔍</i><input class="input" id="iqKw" placeholder="搜索题干" style="min-width:200px" /></div>
+          <select class="select" id="kbFilter"></select>
+          <select class="select" id="topicFilter" style="max-width:200px"></select>
+          <select class="select" id="diffFilter">
+            <option value="">全部难度</option><option value="easy">简单</option>
+            <option value="medium">中等</option><option value="hard">困难</option>
+          </select>
+          <label class="checkbox" style="margin-left:2px"><input type="checkbox" id="unclassifiedOnly"> 只看未分类</label>
+          <button class="btn btn-primary btn-sm" id="queryBtn">查询</button>
+          <button class="btn btn-outline btn-sm" id="resetBtn">重置</button>
+          <div class="spacer"></div>
+          <span class="small muted" id="resultHint"></span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>题目</th>
+                <th style="width:230px">来源</th>
+                <th style="width:88px">难度</th>
+                <th style="width:150px">主题</th>
+                <th style="width:130px">操作</th>
+              </tr>
+            </thead>
+            <tbody id="iqBody"></tbody>
+          </table>
+        </div>
+        <div id="iqEmpty" style="display:none"></div>
+
+        <div class="a-card-body" style="padding:12px 20px 16px">
+          <div class="pager iq-pager">
+            <div class="row gap-12">
+              <span class="small muted" id="pageInfo"></span>
+              <select class="select" id="pageSize" style="height:32px;width:104px;font-size:12px">
+                <option value="10">10 条/页</option>
+                <option value="20">20 条/页</option>
+                <option value="50">50 条/页</option>
+              </select>
+            </div>
+            <div class="pages" id="iqPager"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- 详情 -->
+<div class="modal-mask" id="detailModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div>
+        <h3>面试题详情</h3>
+        <div class="sub" id="detailMeta"></div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body" style="max-height:64vh;overflow-y:auto" id="detailBody"></div>
+    <div class="modal-foot" id="detailFoot"></div>
+  </div>
+</div>
+
+<!-- 编辑主题 / 难度 -->
+<div class="modal-mask" id="editModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3>编辑题目</h3>
+        <div class="sub">题干与参考答案来自知识库，只读；仅可修改主题与难度</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="readonly-stem" id="editStem"></div>
+      <div class="form-grid mt-16">
+        <div class="field">
+          <label>主题</label>
+          <select class="select" id="editTopic"></select>
+          <div class="hint">主题词表来自系统配置，可选择「未分类」清空主题</div>
+        </div>
+        <div class="field">
+          <label>难度</label>
+          <select class="select" id="editDiff">
+            <option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="editSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 录入题目 -->
+<div class="modal-mask" id="entryModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3>录入面试题</h3>
+        <div class="sub">手工录入的题目会在题干旁展示来源标识</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field" id="f-eKb">
+          <label class="req">所属知识库</label>
+          <select class="select" id="entryKb"></select>
+          <div class="err-text">请选择所属知识库</div>
+        </div>
+        <div class="field" id="f-eStem">
+          <label class="req">题干</label>
+          <textarea class="textarea" id="entryStem" rows="3" placeholder="请输入面试题题干"></textarea>
+          <div class="err-text">请输入题干</div>
+        </div>
+        <div class="field">
+          <label>参考答案（可留空）</label>
+          <textarea class="textarea" id="entryAnswer" rows="3" placeholder="可留空，后续可由知识库补全"></textarea>
+        </div>
+        <div class="form-grid cols-2">
+          <div class="field">
+            <label>主题</label>
+            <select class="select" id="entryTopic"></select>
+          </div>
+          <div class="field">
+            <label>难度</label>
+            <select class="select" id="entryDiff">
+              <option value="medium" selected>中等</option>
+              <option value="easy">简单</option><option value="hard">困难</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>标签</label>
+          <input class="input" id="entryTags" placeholder="多个标签用逗号分隔，如 RAG, 检索" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="entrySave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 手动导入 Markdown -->
+<div class="modal-mask" id="mdModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div>
+        <h3>手动导入 Markdown</h3>
+        <div class="sub">按 # ~ ### 标题切题，标题为题干、正文为参考答案</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body" style="max-height:68vh;overflow-y:auto">
+      <div class="field" id="f-mdKb">
+        <label class="req">所属知识库</label>
+        <select class="select" id="mdKb"></select>
+        <div class="err-text">请选择所属知识库</div>
+      </div>
+      <div class="dropzone mt-16" id="mdDropzone">
+        <div class="dz-icon">📄</div>
+        <b>点击选择 Markdown 文件，或拖拽到此处</b>
+        <span>仅支持 .md，单次最多 500 道</span>
+        <input type="file" id="mdFile" accept=".md" hidden />
+      </div>
+      <div class="small muted mt-8" id="mdFileInfo">未选择文件</div>
+      <div id="mdPreview" class="mt-16"></div>
+      <div id="mdBatch" style="display:none" class="mt-16">
+        <div class="form-grid cols-2">
+          <div class="field">
+            <label>统一主题</label>
+            <select class="select" id="mdTopic"></select>
+          </div>
+          <div class="field">
+            <label>统一难度</label>
+            <select class="select" id="mdDiff">
+              <option value="medium" selected>中等</option>
+              <option value="easy">简单</option><option value="hard">困难</option>
+            </select>
+          </div>
+        </div>
+        <div class="field mt-12">
+          <label>统一标签</label>
+          <input class="input" id="mdTags" placeholder="多个标签用逗号分隔，可留空" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="mdConfirm" disabled>确认导入</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script>
+(function () {
+  if (!Admin.renderShell('interview-questions')) return;
+  UI.bindModals();
+
+  const subjects = Admin.getSubjects();
+  const kbMap = {}; subjects.forEach(s => kbMap[s.id] = s);
+
+  const TOPIC_VOCAB = {
+    agent: ['大模型基础', 'Prompt 工程', 'RAG 与检索', '工具调用', '多智能体', '工程实践'],
+    llm: ['Transformer', '微调与对齐', '推理优化', '模型评测', '部署落地'],
+    embodied: ['运动学', '强化学习', '感知与规划', 'Sim2Real'],
+    embedded: ['RTOS', '嵌入式 C', '边缘推理', '硬件驱动'],
+    testing: ['测试设计', '自动化测试', 'AI 评测', '质量体系'],
+    ops: ['容器化', 'Kubernetes', 'GPU 运维', '可观测性'],
+    visual: ['视觉基础', 'AIGC 工具', '品牌一致性', '交付规范'],
+    video: ['叙事结构', '分镜脚本', 'AI 视频生成', '成片工作流']
+  };
+  const SOURCE_NAME = { parse: '知识库文档解析', manual: '手工录入', markdown: '手动导入 Markdown' };
+
+  function buildSeed() {
+    let n = 1001;
+    const out = [];
+    subjects.forEach((s, si) => {
+      const bank = DB.INTERVIEW_BANK[s.id] || [];
+      const vocab = TOPIC_VOCAB[s.id] || [];
+      bank.forEach((item, i) => {
+        let source = 'parse';
+        if (i === 1) source = 'markdown';
+        if (s.id === 'agent' && i === 2) source = 'manual';
+        let topic = null;
+        if (i !== bank.length - 1) {
+          topic = vocab[i % Math.max(1, vocab.length - 2)] || null;
+        }
+        if (s.id === 'agent' && i === 2) topic = '大模型性能调优';
+        out.push({
+          id: 'IQ-' + n++,
+          subjectId: s.id,
+          subjectName: s.name,
+          source,
+          docTitle: source === 'manual' ? '手工录入' : `《${s.name}》面试真题解析.md`,
+          docIndex: source === 'manual' ? null : i + 1,
+          q: item.q,
+          answer: `参考回答要点：${item.keys.join('、')}。建议结合项目实践，说明方案选择与落地效果。`,
+          topic,
+          difficulty: ['medium', 'hard', 'easy'][i % 3],
+          tags: item.keys,
+          createdAt: `2026-10-${String(12 + (si * 3 + i) % 22).padStart(2, '0')} 1${i % 9}:2${i % 9}`
+        });
+      });
+    });
+    return out;
+  }
+
+  let list = UI.Store.get('admin_interview', null);
+  if (!Array.isArray(list)) { list = buildSeed(); UI.Store.set('admin_interview', list); }
+  const save = () => UI.Store.set('admin_interview', list);
+
+  let applied = { kw: '', kb: '', topic: '', diff: '', unclassified: false };
+  let page = 1;
+  let pageSize = 10;
+  let editId = null;
+  let mdParsed = null;
+  let mdFileInfo = null;
+
+  /* ---------- 工具 ---------- */
+  function topicOptions(kbId, includeAll) {
+    let topics = [];
+    if (kbId) {
+      topics = (TOPIC_VOCAB[kbId] || []).slice();
+      list.filter(x => x.subjectId === kbId && x.topic && !topics.includes(x.topic)).forEach(x => topics.push(x.topic));
+    } else {
+      Object.keys(TOPIC_VOCAB).forEach(k => TOPIC_VOCAB[k].forEach(t => { if (!topics.includes(t)) topics.push(t); }));
+      list.filter(x => x.topic && !topics.includes(x.topic)).forEach(x => topics.push(x.topic));
+    }
+    return topics;
+  }
+
+  function sourceText(item) {
+    if (item.source === 'manual') return `${item.subjectName} · 手工录入 · 无源文档`;
+    return `${item.subjectName} · ${item.docTitle} · 第 ${item.docIndex} 题`;
+  }
+
+  /* ---------- 筛选控件 ---------- */
+  document.getElementById('kbFilter').innerHTML = '<option value="">全部知识库</option>' +
+    subjects.map(s => `<option value="${s.id}">${UI.esc(s.name)} 知识库</option>`).join('');
+
+  function refreshTopicFilter() {
+    const kbId = document.getElementById('kbFilter').value;
+    const counts = {};
+    list.forEach(x => {
+      if (kbId && x.subjectId !== kbId) return;
+      const key = x.topic || '__none';
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    const vocab = topicOptions(kbId, true);
+    let opts = '<option value="">全部主题</option>';
+    vocab.forEach(t => {
+      const isOut = !(kbId ? (TOPIC_VOCAB[kbId] || []) : Object.values(TOPIC_VOCAB).flat()).includes(t);
+      opts += `<option value="${UI.esc(t)}">${UI.esc(t)}（${counts[t] || 0}）${isOut ? ' · 词表外' : ''}</option>`;
+    });
+    const un = counts.__none || 0;
+    opts += `<option value="__none">未分类（${un}）</option>`;
+    const sel = document.getElementById('topicFilter');
+    sel.innerHTML = opts;
+    sel.disabled = document.getElementById('unclassifiedOnly').checked;
+    sel.value = applied.topic || '';
+  }
+
+  document.getElementById('kbFilter').addEventListener('change', () => {
+    document.getElementById('topicFilter').value = '';
+    refreshTopicFilter();
+  });
+
+  document.getElementById('unclassifiedOnly').addEventListener('change', e => {
+    const topicSel = document.getElementById('topicFilter');
+    if (e.target.checked) { topicSel.value = ''; topicSel.disabled = true; }
+    else topicSel.disabled = false;
+  });
+  document.getElementById('topicFilter').addEventListener('change', e => {
+    if (e.target.value) document.getElementById('unclassifiedOnly').checked = false;
+  });
+
+  /* ---------- 列表 ---------- */
+  function currentList() {
+    return list.filter(x => {
+      if (applied.kw && !x.q.toLowerCase().includes(applied.kw.toLowerCase())) return false;
+      if (applied.kb && x.subjectId !== applied.kb) return false;
+      if (applied.unclassified) { if (x.topic) return false; }
+      else if (applied.topic === '__none') { if (x.topic) return false; }
+      else if (applied.topic && x.topic !== applied.topic) return false;
+      if (applied.diff && x.difficulty !== applied.diff) return false;
+      return true;
+    });
+  }
+
+  function render() {
+    const all = currentList();
+    const pages = Math.max(1, Math.ceil(all.length / pageSize));
+    if (page > pages) page = pages;
+    const rows = all.slice((page - 1) * pageSize, page * pageSize);
+    document.getElementById('resultHint').textContent = `共 ${all.length} 道题目`;
+    const tbody = document.getElementById('iqBody');
+    const empty = document.getElementById('iqEmpty');
+
+    if (!all.length) {
+      tbody.innerHTML = '';
+      empty.style.display = '';
+      const isUn = applied.unclassified || applied.topic === '__none';
+      empty.innerHTML = `<div class="empty"><div class="em-icon">${isUn ? '🎉' : '🧠'}</div>
+        <div class="em-title">${isUn ? '没有未分类的题目' : '没有符合条件的题目'}</div>
+        <div class="em-sub">${isUn ? '题库里的题都标好主题了' : '试试调整筛选条件后重新查询'}</div></div>`;
+      document.getElementById('pageInfo').textContent = '暂无数据';
+      document.getElementById('iqPager').innerHTML = '';
+      Admin.applyPermissions();
+      return;
+    }
+    empty.style.display = 'none';
+    tbody.innerHTML = rows.map(x => {
+      const vocab = TOPIC_VOCAB[x.subjectId] || [];
+      const out = x.topic && !vocab.includes(x.topic);
+      return `<tr>
+        <td>
+          <div class="iq-stem-line">
+            <button class="stem-link" data-act="detail" data-id="${x.id}">${UI.esc(x.q)}</button>
+            ${x.source === 'manual' ? '<span class="badge badge-brand">手工录入</span>' : ''}
+            ${x.source === 'markdown' ? '<span class="badge badge-info">Markdown</span>' : ''}
+          </div>
+          <div class="small muted mt-8">${(x.tags || []).map(t => '#' + UI.esc(t)).join(' ') || '暂无标签'}</div>
+        </td>
+        <td>
+          <div class="source-text">${UI.esc(sourceText(x))}</div>
+          <div class="small muted mt-8">${SOURCE_NAME[x.source]}</div>
+        </td>
+        <td>${Admin.diffHtml(x.difficulty)}</td>
+        <td>${x.topic ? `<span class="badge ${out ? 'badge-warn' : 'badge-brand'}">${UI.esc(x.topic)}</span>${out ? '<div class="small muted mt-8">词表外</div>' : ''}` : '<span class="badge badge-gray">未分类</span>'}</td>
+        <td><div class="inline-actions">
+          <button data-act="detail" data-id="${x.id}">详情</button>
+          <button data-act="edit" data-id="${x.id}" data-perm="edit">编辑</button>
+          <button class="danger" data-act="delete" data-id="${x.id}" data-perm="delete">删除</button>
+        </div></td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('pageInfo').textContent = `第 ${page} / ${pages} 页 · 共 ${all.length} 条`;
+    let btns = `<button data-page="${page - 1}" ${page === 1 ? 'disabled' : ''}>‹</button>`;
+    for (let i = 1; i <= pages; i++) {
+      if (pages > 7 && i > 2 && i < pages - 1 && Math.abs(i - page) > 1) {
+        if (i === 3) btns += '<span style="padding:0 4px;color:var(--muted-2)">…</span>';
+        continue;
+      }
+      btns += `<button data-page="${i}" class="${i === page ? 'active' : ''}">${i}</button>`;
+    }
+    btns += `<button data-page="${page + 1}" ${page === pages ? 'disabled' : ''}>›</button>`;
+    document.getElementById('iqPager').innerHTML = btns;
+    Admin.applyPermissions();
+  }
+
+  /* ---------- 查询 / 重置 ---------- */
+  document.getElementById('queryBtn').onclick = () => {
+    applied = {
+      kw: document.getElementById('iqKw').value.trim(),
+      kb: document.getElementById('kbFilter').value,
+      topic: document.getElementById('unclassifiedOnly').checked ? '' : document.getElementById('topicFilter').value,
+      diff: document.getElementById('diffFilter').value,
+      unclassified: document.getElementById('unclassifiedOnly').checked
+    };
+    page = 1; render();
+  };
+  document.getElementById('iqKw').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('queryBtn').click(); });
+
+  document.getElementById('resetBtn').onclick = () => {
+    document.getElementById('iqKw').value = '';
+    document.getElementById('kbFilter').value = '';
+    document.getElementById('diffFilter').value = '';
+    document.getElementById('unclassifiedOnly').checked = false;
+    document.getElementById('topicFilter').disabled = false;
+    document.getElementById('topicFilter').innerHTML = '<option value="">全部主题</option>';
+    applied = { kw: '', kb: '', topic: '', diff: '', unclassified: false };
+    page = 1;
+    refreshTopicFilter();
+    render();
+    UI.toast('筛选条件已重置', 'info');
+  };
+
+  document.getElementById('pageSize').onchange = e => { pageSize = +e.target.value; page = 1; render(); };
+  document.getElementById('iqPager').addEventListener('click', e => {
+    const b = e.target.closest('button[data-page]'); if (!b || b.disabled) return;
+    page = +b.dataset.page; render();
+  });
+
+  /* ---------- 详情 ---------- */
+  function openDetail(id) {
+    const x = list.find(y => y.id === id); if (!x) return;
+    document.getElementById('detailMeta').innerHTML = `<span>${UI.esc(x.subjectName)} 知识库</span> · <span>${UI.esc(SOURCE_NAME[x.source])}</span>`;
+    document.getElementById('detailBody').innerHTML = `
+      <div class="detail-section">
+        <div class="ds-label">题干</div>
+        <div class="ds-stem">${UI.esc(x.q)}</div>
+        <div class="row gap-6 wrap mt-12">${(x.tags || []).map(t => `<span class="tag">#${UI.esc(t)}</span>`).join('') || '<span class="small muted">暂无标签</span>'}</div>
+      </div>
+      <div class="detail-section">
+        <div class="ds-label">参考答案</div>
+        <div class="ds-text">${x.answer ? UI.esc(x.answer) : '暂无参考答案'}</div>
+      </div>
+      <div class="detail-section">
+        <div class="ds-label">来源与分类</div>
+        <div class="detail-grid">
+          <div class="dg-i"><span class="k">知识库</span><span class="v">${UI.esc(x.subjectName)}</span></div>
+          <div class="dg-i"><span class="k">来源</span><span class="v">${UI.esc(SOURCE_NAME[x.source])}</span></div>
+          <div class="dg-i"><span class="k">文档</span><span class="v">${x.source === 'manual' ? '无源文档' : UI.esc(x.docTitle)}</span></div>
+          <div class="dg-i"><span class="k">题号</span><span class="v">${x.source === 'manual' ? '—' : '第 ' + x.docIndex + ' 题'}</span></div>
+          <div class="dg-i"><span class="k">主题</span><span class="v">${x.topic ? UI.esc(x.topic) : '未分类'}</span></div>
+          <div class="dg-i"><span class="k">难度</span><span class="v">${UI.diffName(x.difficulty)}</span></div>
+        </div>
+      </div>`;
+    const foot = document.getElementById('detailFoot');
+    foot.innerHTML = `<button class="btn btn-outline" data-detail-act="edit" data-perm="edit">编辑主题 / 难度</button>
+      <button class="btn btn-danger-soft" data-detail-act="delete" data-perm="delete">删除</button>
+      <button class="btn btn-ghost" data-close>关闭</button>`;
+    foot.querySelectorAll('[data-detail-act]').forEach(b => b.onclick = () => {
+      if (b.dataset.detailAct === 'edit') { UI.close('detailModal'); openEdit(id); }
+      else deleteItem(id);
+    });
+    UI.open('detailModal');
+    Admin.applyPermissions(foot);
+  }
+
+  /* ---------- 编辑 ---------- */
+  function openEdit(id) {
+    const x = list.find(y => y.id === id); if (!x) return;
+    editId = id;
+    document.getElementById('editStem').textContent = x.q;
+    const topics = topicOptions(x.subjectId, true);
+    const opts = ['<option value="">未分类（清空主题）</option>'].concat(topics.map(t => `<option value="${UI.esc(t)}">${UI.esc(t)}</option>`)).join('');
+    document.getElementById('editTopic').innerHTML = opts;
+    document.getElementById('editTopic').value = x.topic || '';
+    document.getElementById('editDiff').value = x.difficulty;
+    UI.open('editModal');
+  }
+
+  document.getElementById('editSave').onclick = () => {
+    const x = list.find(y => y.id === editId); if (!x) return;
+    x.topic = document.getElementById('editTopic').value || null;
+    x.difficulty = document.getElementById('editDiff').value;
+    save();
+    Admin.log('编辑', '面试题 ' + x.id, `主题：${x.topic || '未分类'}，难度：${UI.diffName(x.difficulty)}`);
+    UI.close('editModal');
+    render();
+    refreshTopicFilter();
+    UI.toast('已保存主题与难度', 'success');
+  };
+
+  /* ---------- 删除 ---------- */
+  async function deleteItem(id) {
+    const x = list.find(y => y.id === id); if (!x) return;
+    const msg = x.source === 'manual'
+      ? '该题为手工录入，没有源文档，删除后不可恢复。'
+      : `该题来自${SOURCE_NAME[x.source]}，删除后不影响源文档；若重新解析源文档，可能再次入库。`;
+    const ok = await UI.confirm({ title: '删除面试题', message: msg, confirmText: '确认删除', danger: true, icon: '🗑' });
+    if (!ok) return;
+    list = list.filter(y => y.id !== id);
+    save();
+    Admin.log('删除', '面试题 ' + x.id, x.q.slice(0, 36));
+    UI.close('detailModal');
+    render();
+    refreshTopicFilter();
+    UI.toast('题目已删除（逻辑删除）', 'success');
+  }
+
+  /* ---------- 表格事件 ---------- */
+  document.getElementById('iqBody').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const id = b.dataset.id;
+    if (b.dataset.act === 'detail') return openDetail(id);
+    if (b.dataset.act === 'edit') return openEdit(id);
+    if (b.dataset.act === 'delete') return deleteItem(id);
+  });
+
+  /* ---------- 录入 ---------- */
+  const entryKb = document.getElementById('entryKb');
+  entryKb.innerHTML = '<option value="">请选择知识库</option>' + subjects.map(s => `<option value="${s.id}">${UI.esc(s.name)}</option>`).join('');
+
+  function entryTopicOptions() {
+    const kb = entryKb.value;
+    const topics = topicOptions(kb, true);
+    document.getElementById('entryTopic').innerHTML = '<option value="">暂不分类（未分类）</option>' +
+      topics.map(t => `<option value="${UI.esc(t)}">${UI.esc(t)}</option>`).join('');
+  }
+  entryKb.addEventListener('change', () => {
+    entryTopicOptions();
+    document.getElementById('f-eKb').classList.remove('invalid');
+  });
+  document.getElementById('entryStem').addEventListener('input', () => document.getElementById('f-eStem').classList.remove('invalid'));
+
+  document.getElementById('entryBtn').onclick = () => {
+    entryKb.value = '';
+    document.getElementById('entryStem').value = '';
+    document.getElementById('entryAnswer').value = '';
+    document.getElementById('entryDiff').value = 'medium';
+    document.getElementById('entryTags').value = '';
+    document.getElementById('f-eKb').classList.remove('invalid');
+    document.getElementById('f-eStem').classList.remove('invalid');
+    entryTopicOptions();
+    UI.open('entryModal');
+  };
+
+  document.getElementById('entrySave').onclick = () => {
+    const kb = entryKb.value;
+    const stem = document.getElementById('entryStem').value.trim();
+    const okK = !!kb, okS = !!stem;
+    document.getElementById('f-eKb').classList.toggle('invalid', !okK);
+    document.getElementById('f-eStem').classList.toggle('invalid', !okS);
+    if (!okK) { UI.toast('请选择所属知识库', 'error'); return; }
+    if (!okS) { UI.toast('请输入题干', 'error'); return; }
+    const s = kbMap[kb];
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const item = {
+      id: 'IQ-' + Date.now().toString().slice(-6),
+      subjectId: kb, subjectName: s.name, source: 'manual', docTitle: '手工录入', docIndex: null,
+      q: stem, answer: document.getElementById('entryAnswer').value.trim(),
+      topic: document.getElementById('entryTopic').value || null,
+      difficulty: document.getElementById('entryDiff').value,
+      tags: document.getElementById('entryTags').value.split(/[,，]/).map(x => x.trim()).filter(Boolean),
+      createdAt: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
+    };
+    list.unshift(item);
+    save();
+    Admin.log('新增', '面试题 ' + item.id, '手工录入 · ' + s.name);
+    UI.close('entryModal');
+    refreshTopicFilter();
+    render();
+    UI.toast('题目已录入', 'success');
+  };
+
+  /* ---------- Markdown 导入 ---------- */
+  const mdDropzone = document.getElementById('mdDropzone');
+  const mdFileInput = document.getElementById('mdFile');
+  const mdKb = document.getElementById('mdKb');
+  mdKb.innerHTML = '<option value="">请选择知识库</option>' + subjects.map(s => `<option value="${s.id}">${UI.esc(s.name)}</option>`).join('');
+
+  function mdTopicOptions() {
+    const kb = mdKb.value;
+    const topics = topicOptions(kb, true);
+    document.getElementById('mdTopic').innerHTML = '<option value="">不设置（未分类）</option>' +
+      topics.map(t => `<option value="${UI.esc(t)}">${UI.esc(t)}</option>`).join('');
+  }
+  mdKb.addEventListener('change', () => { mdTopicOptions(); document.getElementById('f-mdKb').classList.remove('invalid'); });
+
+  document.getElementById('mdImportBtn').onclick = () => {
+    mdKb.value = '';
+    mdParsed = null; mdFileInfo = null;
+    document.getElementById('mdFileInfo').textContent = '未选择文件';
+    document.getElementById('mdPreview').innerHTML = '';
+    document.getElementById('mdBatch').style.display = 'none';
+    document.getElementById('mdConfirm').disabled = true;
+    document.getElementById('f-mdKb').classList.remove('invalid');
+    mdTopicOptions();
+    UI.open('mdModal');
+  };
+
+  mdDropzone.addEventListener('click', () => mdFileInput.click());
+  mdDropzone.addEventListener('dragover', e => { e.preventDefault(); mdDropzone.classList.add('drag'); });
+  mdDropzone.addEventListener('dragleave', () => mdDropzone.classList.remove('drag'));
+  mdDropzone.addEventListener('drop', e => {
+    e.preventDefault(); mdDropzone.classList.remove('drag');
+    if (e.dataTransfer.files[0]) parseMdFile(e.dataTransfer.files[0]);
+  });
+  mdFileInput.addEventListener('change', e => { if (e.target.files[0]) parseMdFile(e.target.files[0]); e.target.value = ''; });
+
+  function parseMdFile(file) {
+    if (!/\.md$/i.test(file.name)) { UI.toast('仅支持 .md 文件', 'error'); return; }
+    if (file.size > 5 * 1024 * 1024) { UI.toast('文件不能超过 5MB', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const text = String(ev.target.result || '');
+      const lines = text.split(/\r?\n/);
+      const parsed = [];
+      let cur = null, inCode = false;
+      lines.forEach((line, idx) => {
+        if (/^```/.test(line.trim())) { inCode = !inCode; }
+        const m = !inCode && line.match(/^#{1,3}\s+(.+?)\s*$/);
+        if (m) {
+          if (cur) parsed.push(cur);
+          cur = { title: m[1].replace(/^#+\s*/, ''), answer: [], line: idx + 1 };
+        } else if (cur) {
+          cur.answer.push(line);
+        }
+      });
+      if (cur) parsed.push(cur);
+      mdParsed = parsed.slice(0, 500).map(p => ({
+        q: p.title, answer: p.answer.join('\n').trim(), line: p.line
+      })).filter(p => p.q);
+      mdFileInfo = { name: file.name, size: file.size };
+      document.getElementById('mdFileInfo').innerHTML = `<span style="color:var(--text-2);font-weight:600">${UI.esc(file.name)}</span> · ${(file.size / 1024).toFixed(1)} KB`;
+      renderMdPreview();
+    };
+    reader.readAsText(file);
+  }
+
+  function renderMdPreview() {
+    const box = document.getElementById('mdPreview');
+    if (!mdParsed || !mdParsed.length) {
+      box.innerHTML = `<div class="md-warn">未识别到 # ~ ### 标题。请确认文件结构：以标题作为题干，标题下正文作为参考答案。</div>`;
+      document.getElementById('mdBatch').style.display = 'none';
+      document.getElementById('mdConfirm').disabled = true;
+      return;
+    }
+    box.innerHTML = `
+      <div class="md-summary">
+        <span class="badge badge-success">识别到 ${mdParsed.length} 道题</span>
+        <span class="small muted">${mdParsed.length >= 500 ? '已达单次上限 500 道' : '按标题切分成功'}</span>
+        <span class="small muted" style="margin-left:auto">${UI.esc(mdFileInfo.name)}</span>
+      </div>
+      <div class="md-sample-list">
+        ${mdParsed.slice(0, 3).map((p, i) => `
+          <div class="md-sample">
+            <div class="md-sample-head"><span class="badge badge-outline">样例 ${i + 1}</span><span class="small muted">第 ${p.line} 行</span></div>
+            <div class="md-sample-q">${UI.esc(p.q)}</div>
+            <div class="md-sample-a">${UI.esc((p.answer || '（无正文）').slice(0, 90))}${p.answer.length > 90 ? '…' : ''}</div>
+          </div>`).join('')}
+      </div>`;
+    document.getElementById('mdBatch').style.display = '';
+    mdTopicOptions();
+    document.getElementById('mdConfirm').disabled = !mdKb.value;
+    document.getElementById('mdConfirm').textContent = `确认导入 ${mdParsed.length} 道题`;
+  }
+
+  mdKb.addEventListener('change', () => {
+    document.getElementById('mdConfirm').disabled = !mdParsed || !mdParsed.length || !mdKb.value;
+  });
+
+  document.getElementById('mdConfirm').onclick = () => {
+    const kb = mdKb.value;
+    if (!kb) { document.getElementById('f-mdKb').classList.add('invalid'); UI.toast('请选择所属知识库', 'error'); return; }
+    if (!mdParsed || !mdParsed.length) return;
+    const s = kbMap[kb];
+    const topic = document.getElementById('mdTopic').value || null;
+    const diff = document.getElementById('mdDiff').value;
+    const tags = document.getElementById('mdTags').value.split(/[,，]/).map(x => x.trim()).filter(Boolean);
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    mdParsed.forEach((p, i) => {
+      list.unshift({
+        id: 'IQ-' + Date.now().toString().slice(-6) + i,
+        subjectId: kb, subjectName: s.name, source: 'markdown',
+        docTitle: mdFileInfo.name, docIndex: i + 1,
+        q: p.q, answer: p.answer, topic, difficulty: diff, tags: tags.slice(), createdAt: stamp
+      });
+    });
+    save();
+    Admin.log('导入', '面试题库管理', `从 ${mdFileInfo.name} 导入 ${mdParsed.length} 道题到 ${s.name}`);
+    UI.close('mdModal');
+    refreshTopicFilter();
+    render();
+    UI.toast(`已导入 ${mdParsed.length} 道面试题`, 'success');
+    mdParsed = null;
+  };
+
+  /* ---------- 初始化 ---------- */
+  refreshTopicFilter();
+  render();
+})();
+</script>
+<style>
+  .iq-stem-line { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+  .iq-stem-line .stem-link { flex: 1; min-width: 200px; }
+  .stem-link { text-align: left; font-weight: 600; color: var(--text); font-size: 13px; line-height: 1.6; }
+  .stem-link:hover { color: var(--brand); }
+  .source-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .iq-pager .pages { display: flex; gap: 6px; }
+  .iq-pager .pages button { min-width: 32px; height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line-2); background: #fff; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .iq-pager .pages button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .iq-pager .pages button:disabled { opacity: .4; cursor: not-allowed; }
+  .iq-pager .pages button:hover:not(.active):not(:disabled) { border-color: #c7d2fe; color: var(--brand); }
+  .detail-section { padding: 0 0 18px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .detail-section:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+  .ds-label { font-size: 12px; color: var(--muted); font-weight: 650; margin-bottom: 8px; letter-spacing: .03em; }
+  .ds-stem { font-size: 15px; font-weight: 650; line-height: 1.7; }
+  .ds-text { font-size: 13px; color: var(--text-2); line-height: 1.8; white-space: pre-wrap; }
+  .readonly-stem { padding: 13px 14px; background: #f8f9fc; border: 1px solid var(--line); border-radius: 9px; font-size: 13px; line-height: 1.7; color: var(--text-2); }
+  .md-summary { display: flex; gap: 8px; align-items: center; padding: 10px 12px; background: #f8f9fc; border-radius: 9px; font-size: 12px; }
+  .md-sample-list { display: grid; gap: 8px; margin-top: 10px; }
+  .md-sample { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; background: #fff; }
+  .md-sample-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .md-sample-q { font-size: 13px; font-weight: 650; }
+  .md-sample-a { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
+  .md-warn { padding: 14px; border-radius: 9px; background: var(--warn-soft); color: #b54708; font-size: 12.5px; line-height: 1.7; }
+</style>
+</body>
+</html>

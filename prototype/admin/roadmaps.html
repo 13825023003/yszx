@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>学习路线 · 云枢智学管理端</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+  <div id="adminAsideMount"></div>
+  <div class="admin-main">
+    <div id="adminTopbarMount"></div>
+    <main class="admin-content">
+
+      <!-- 列表视图 -->
+      <div id="listView">
+        <div class="page-head">
+          <div>
+            <h1>学习路线</h1>
+            <div class="desc">为每个学科编排 B 站课程学习路径，支持启用 / 禁用与学员视角预览</div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary btn-sm" id="newRouteBtn" data-perm="create">+ 新建路线</button>
+          </div>
+        </div>
+
+        <div class="admin-stats" style="grid-template-columns:repeat(4,1fr)" id="routeStats"></div>
+        <div class="route-grid" id="routeGrid"></div>
+      </div>
+
+      <!-- 详情视图 -->
+      <div id="detailView" style="display:none">
+        <div class="detail-topbar">
+          <button class="btn btn-ghost btn-sm" id="backToList">‹ 返回路线列表</button>
+          <div style="flex:1"></div>
+          <button class="btn btn-outline btn-sm" id="detailPreviewBtn">👁 学员预览</button>
+          <button class="btn btn-primary btn-sm" id="addCoursesBtn" data-perm="edit">+ 从课程库添加</button>
+        </div>
+        <div class="page-head" style="margin-bottom:14px">
+          <div>
+            <h1 id="detailTitle">—</h1>
+            <div class="desc" id="detailSub">—</div>
+          </div>
+        </div>
+        <div class="a-card mb-16">
+          <div class="a-card-body">
+            <div class="detail-grid" id="routeMeta"></div>
+          </div>
+        </div>
+        <div class="a-card">
+          <div class="a-card-head">
+            <div><h3>路线课程</h3><div class="sub" id="courseCountHint"></div></div>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:60px">序号</th>
+                  <th style="width:130px">BV 号</th>
+                  <th>课程名称</th>
+                  <th style="width:100px">时长</th>
+                  <th style="width:100px">播放量</th>
+                  <th style="width:120px">排序</th>
+                  <th style="width:90px">操作</th>
+                </tr>
+              </thead>
+              <tbody id="routeCourseBody"></tbody>
+            </table>
+          </div>
+          <div id="routeCourseEmpty" style="display:none"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- 新建 / 编辑路线 -->
+<div class="modal-mask" id="routeModal">
+  <div class="modal modal-xl">
+    <div class="modal-head">
+      <div>
+        <h3 id="routeModalTitle">新建学习路线</h3>
+        <div class="sub">基本信息 + 按学科从课程库勾选课程，已选课程可调整顺序</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+      <div class="form-grid">
+        <div class="form-grid cols-2">
+          <div class="field" id="f-rName">
+            <label class="req">路线名称</label>
+            <input class="input" id="rName" maxlength="40" placeholder="如：AI 应用开发工程师成长路线" />
+            <div class="err-text">请输入路线名称</div>
+          </div>
+          <div class="field" id="f-rSubject">
+            <label class="req">关联学科</label>
+            <select class="select" id="rSubject"></select>
+            <div class="err-text">请选择关联学科</div>
+          </div>
+        </div>
+        <div class="form-grid cols-3">
+          <div class="field">
+            <label>路线图标</label>
+            <input class="input" id="rIcon" maxlength="4" placeholder="如：🗺" />
+          </div>
+          <div class="field">
+            <label>适合人群</label>
+            <input class="input" id="rAudience" maxlength="30" placeholder="如：零基础转行 / 初级开发者" />
+          </div>
+          <div class="field">
+            <label>状态</label>
+            <div class="row gap-8" style="height:40px">
+              <button class="switch on" id="rStatus" type="button"></button>
+              <span class="small muted" id="rStatusText">启用</span>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label>路线描述</label>
+          <textarea class="textarea" id="rDesc" rows="2" maxlength="200" placeholder="介绍这条路线的学习目标与路径"></textarea>
+        </div>
+
+        <div>
+          <label class="form-label">路线课程</label>
+          <div class="course-picker mt-8">
+            <div class="cp-panel">
+              <div class="cp-head">
+                <span>可选课程 <span class="small muted" id="availHint"></span></span>
+              </div>
+              <div class="cp-list" id="availableCourses"></div>
+            </div>
+            <div class="cp-panel">
+              <div class="cp-head">
+                <span>已选课程 <span class="small muted" id="pickedHint"></span></span>
+              </div>
+              <div class="cp-list" id="pickedCourses"></div>
+            </div>
+          </div>
+          <div class="hint mt-8">勾选课程加入路线；右侧列表可用 ↑↓ 调整先后顺序</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="routeSave">保存路线</button>
+    </div>
+  </div>
+</div>
+
+<!-- 从课程库添加 -->
+<div class="modal-mask" id="addCourseModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div>
+        <h3>从课程库添加</h3>
+        <div class="sub">已添加到当前路线的课程不可重复选择</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="search" style="position:relative">
+        <i style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted-2)">🔍</i>
+        <input class="input" id="addCourseSearch" placeholder="搜索课程名称" style="padding-left:34px" />
+      </div>
+      <div id="addCourseGroups" class="mt-16" style="max-height:52vh;overflow-y:auto"></div>
+    </div>
+    <div class="modal-foot">
+      <span class="small muted" style="margin-right:auto" id="addSelectedHint">已选择 0 门课程</span>
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="addSelectedConfirm" disabled>完成添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 学员预览 -->
+<div class="modal-mask" id="previewModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div><h3>学员视角预览</h3><div class="sub">以学员前台看到的样式展示路线内容</div></div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body" style="max-height:68vh;overflow-y:auto">
+      <div id="previewBody"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script>
+(function () {
+  if (!Admin.renderShell('roadmaps')) return;
+  UI.bindModals();
+
+  let routes = Admin.copy(Admin.getRoutes());
+  let courses = Admin.getCourses();
+  let subjects = Admin.getSubjects();
+  const subjectMap = {}; subjects.forEach(s => subjectMap[s.id] = s);
+  const courseMap = {}; courses.forEach(c => courseMap[c.id] = c);
+  let mode = 'list';
+  let currentId = null;
+  let editingId = null;
+  let picked = [];
+  let addSelected = new Set();
+
+  const durText = min => {
+    const h = Math.floor(min / 60), m = min % 60;
+    return h ? `${h} 小时${m ? ' ' + m + ' 分' : ''}` : `${m} 分钟`;
+  };
+  const routeCourses = r => (r.courseIds || []).map(id => courseMap[id]).filter(Boolean);
+  const totalMin = r => routeCourses(r).reduce((n, c) => n + c.minutes, 0);
+  const save = () => Admin.saveRoutes(routes);
+  const subjName = id => (subjectMap[id] || {}).name || '未关联学科';
+
+  /* ---------- 列表 ---------- */
+  function renderStats() {
+    const enabled = routes.filter(r => r.enabled).length;
+    const totalCourses = routes.reduce((n, r) => n + routeCourses(r).length, 0);
+    const data = [
+      { label: '路线总数', value: routes.length, icon: '🗺' },
+      { label: '已启用', value: enabled, icon: '✅' },
+      { label: '覆盖学科', value: new Set(routes.map(r => r.subjectId)).size, icon: '📚' },
+      { label: '关联课程次', value: totalCourses, icon: '🎬' }
+    ];
+    document.getElementById('routeStats').innerHTML = data.map(s => `
+      <div class="a-stat">
+        <div class="as-top"><span class="as-label">${s.label}</span><span class="as-icon" style="background:#eef2ff">${s.icon}</span></div>
+        <div class="as-num">${s.value}</div>
+        <div class="as-trend">学习路线实时统计</div>
+      </div>`).join('');
+  }
+
+  function renderList() {
+    mode = 'list';
+    document.getElementById('listView').style.display = '';
+    document.getElementById('detailView').style.display = 'none';
+    renderStats();
+    const grid = document.getElementById('routeGrid');
+    if (!routes.length) {
+      grid.innerHTML = '';
+      grid.insertAdjacentHTML('afterend', `<div class="a-card" id="routeEmpty"><div class="empty">
+        <div class="em-icon">🗺</div><div class="em-title">暂无学习路线</div>
+        <div class="em-sub">点击上方「新建路线」创建一条</div></div></div>`);
+      return;
+    }
+    const em = document.getElementById('routeEmpty'); if (em) em.remove();
+    grid.innerHTML = routes.map(r => {
+      const cs = routeCourses(r);
+      const subj = subjectMap[r.subjectId];
+      return `<div class="route-card">
+        <div class="rc-top">
+          <div class="rc-icon" style="background:${subj ? subj.soft : '#eef2ff'}">${r.icon || (subj ? subj.icon : '🗺')}</div>
+          <div style="flex:1;min-width:0">
+            <div class="rc-name ellipsis">${UI.esc(r.name)}</div>
+            <div class="rc-meta">${UI.esc(subjName(r.subjectId))} · ${cs.length} 门课程</div>
+          </div>
+          <button class="switch ${r.enabled ? 'on' : ''}" data-act="toggle" data-id="${r.id}" title="${r.enabled ? '点击禁用' : '点击启用'}" data-perm="edit"></button>
+        </div>
+        <div class="row gap-6 wrap" style="margin-bottom:10px">
+          ${r.enabled ? '<span class="badge badge-success">已启用</span>' : '<span class="badge badge-gray">已禁用</span>'}
+          <span class="badge badge-outline">${durText(totalMin(r))}</span>
+        </div>
+        <div class="rc-desc">${UI.esc(r.desc || '暂无路线描述')}</div>
+        <div class="rc-courses">
+          ${cs.slice(0, 4).map((c, i) => `<div><span class="muted">${String(i + 1).padStart(2, '0')}</span><span class="ellipsis">${UI.esc(c.title)}</span></div>`).join('') || '<div class="muted">暂无课程</div>'}
+          ${cs.length > 4 ? `<div class="muted">… 还有 ${cs.length - 4} 门课程</div>` : ''}
+        </div>
+        <div class="rc-foot">
+          <button class="btn btn-soft btn-xs" data-act="manage" data-id="${r.id}">课程管理</button>
+          <button class="btn btn-outline btn-xs" data-act="preview" data-id="${r.id}">预览</button>
+          <button class="btn btn-outline btn-xs" data-act="edit" data-id="${r.id}" data-perm="edit">编辑</button>
+          <button class="btn btn-ghost btn-xs" style="color:var(--danger);margin-left:auto" data-act="delete" data-id="${r.id}" data-perm="delete">删除</button>
+        </div>
+      </div>`;
+    }).join('');
+    Admin.applyPermissions();
+  }
+
+  /* ---------- 详情 ---------- */
+  function openDetail(id) {
+    const r = routes.find(x => x.id === id); if (!r) return;
+    currentId = id;
+    mode = 'detail';
+    document.getElementById('listView').style.display = 'none';
+    document.getElementById('detailView').style.display = '';
+    const subj = subjectMap[r.subjectId];
+    document.getElementById('detailTitle').textContent = `${r.name} - 课程管理`;
+    document.getElementById('detailSub').textContent = `${subjName(r.subjectId)} · ${r.enabled ? '已启用' : '已禁用'} · 共 ${routeCourses(r).length} 门课程`;
+    document.getElementById('routeMeta').innerHTML = `
+      <div class="dg-i"><span class="k">关联学科</span><span class="v">${UI.esc(subjName(r.subjectId))}</span></div>
+      <div class="dg-i"><span class="k">状态</span><span class="v">${r.enabled ? '<span class="badge badge-success">已启用</span>' : '<span class="badge badge-gray">已禁用</span>'}</span></div>
+      <div class="dg-i"><span class="k">课程数</span><span class="v">${routeCourses(r).length} 门</span></div>
+      <div class="dg-i"><span class="k">总时长</span><span class="v">${durText(totalMin(r))}</span></div>
+      <div class="dg-i"><span class="k">适合人群</span><span class="v">${UI.esc(r.audience || '—')}</span></div>
+      <div class="dg-i"><span class="k">路线图标</span><span class="v">${r.icon || '🗺'}</span></div>
+      <div class="dg-i" style="grid-column:1/-1"><span class="k">路线描述</span><span class="v">${UI.esc(r.desc || '暂无描述')}</span></div>`;
+    renderDetailCourses(r);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function renderDetailCourses(r) {
+    const list = routeCourses(r);
+    document.getElementById('courseCountHint').textContent = `共 ${list.length} 门课程，总计时长 ${durText(totalMin(r))}`;
+    const body = document.getElementById('routeCourseBody');
+    const empty = document.getElementById('routeCourseEmpty');
+    if (!list.length) {
+      body.innerHTML = '';
+      empty.style.display = '';
+      empty.innerHTML = `<div class="empty"><div class="em-icon">🎬</div><div class="em-title">暂无课程</div>
+        <div class="em-sub">点击右上角「从课程库添加」为路线选择课程</div></div>`;
+      Admin.applyPermissions();
+      return;
+    }
+    empty.style.display = 'none';
+    body.innerHTML = list.map((c, i) => `
+      <tr>
+        <td class="muted">${i + 1}</td>
+        <td class="small nowrap">${UI.esc(c.bv || '—')}</td>
+        <td>
+          <div class="row gap-12">
+            <div class="cover-thumb" style="width:58px;height:34px;font-size:12px;background:${c.cover || DB.COVERS[0]}">▶</div>
+            <div style="min-width:0">
+              <div class="cell-main ellipsis" style="max-width:420px" title="${UI.esc(c.title)}">${UI.esc(c.title)}</div>
+              <div class="small muted mt-8">${UI.esc(subjName(c.subjectId))} · ${UI.esc(c.source || 'B站')}</div>
+            </div>
+          </div>
+        </td>
+        <td class="nowrap">${c.minutes} 分钟</td>
+        <td class="small muted">${Admin.formatNum(c.plays || 0)}</td>
+        <td>
+          <div class="row gap-4">
+            <button class="btn btn-ghost btn-xs" data-act="up" data-idx="${i}" ${i === 0 ? 'disabled' : ''} data-perm="edit">↑</button>
+            <button class="btn btn-ghost btn-xs" data-act="down" data-idx="${i}" ${i === list.length - 1 ? 'disabled' : ''} data-perm="edit">↓</button>
+          </div>
+        </td>
+        <td><button class="inline-actions" style="color:var(--danger);font-size:12px;font-weight:600" data-act="remove" data-idx="${i}" data-perm="edit">移除</button></td>
+      </tr>`).join('');
+    Admin.applyPermissions();
+  }
+
+  /* ---------- 卡片交互 ---------- */
+  document.getElementById('routeGrid').addEventListener('click', async e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const r = routes.find(x => x.id === b.dataset.id); if (!r) return;
+    const act = b.dataset.act;
+    if (act === 'manage') return openDetail(r.id);
+    if (act === 'preview') return openPreview(r.id);
+    if (act === 'edit') return openForm(r.id);
+    if (act === 'toggle') {
+      r.enabled = !r.enabled;
+      save();
+      Admin.log(r.enabled ? '启用' : '禁用', '学习路线「' + r.name + '」', r.enabled ? '路线已上线' : '路线已下线');
+      UI.toast(r.enabled ? '路线已启用' : '路线已禁用', r.enabled ? 'success' : 'info');
+      renderList();
+      return;
+    }
+    if (act === 'delete') {
+      const ok = await UI.confirm({
+        title: '删除学习路线',
+        message: `确定删除路线「${r.name}」吗？删除后学员前台将不再展示该路线，且不可恢复。`,
+        confirmText: '确认删除', danger: true, icon: '🗑'
+      });
+      if (!ok) return;
+      routes = routes.filter(x => x.id !== r.id);
+      save();
+      Admin.log('删除', '学习路线「' + r.name + '」', '逻辑删除');
+      renderList();
+      UI.toast('路线已删除', 'success');
+    }
+  });
+
+  document.getElementById('backToList').onclick = () => renderList();
+  document.getElementById('detailPreviewBtn').onclick = () => openPreview(currentId);
+  document.getElementById('addCoursesBtn').onclick = () => openAddCourses();
+
+  document.getElementById('routeCourseBody').addEventListener('click', async e => {
+    const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+    const r = routes.find(x => x.id === currentId); if (!r) return;
+    const idx = +b.dataset.idx;
+    let msg = '课程顺序已更新';
+    if (b.dataset.act === 'up' && idx > 0) {
+      [r.courseIds[idx - 1], r.courseIds[idx]] = [r.courseIds[idx], r.courseIds[idx - 1]];
+    } else if (b.dataset.act === 'down' && idx < r.courseIds.length - 1) {
+      [r.courseIds[idx + 1], r.courseIds[idx]] = [r.courseIds[idx], r.courseIds[idx + 1]];
+    } else if (b.dataset.act === 'remove') {
+      const c = courseMap[r.courseIds[idx]];
+      const ok = await UI.confirm({ title: '移除课程', message: `确定从路线「${r.name}」中移除课程「${c ? c.title : ''}」吗？`, confirmText: '移除', danger: true, icon: '−' });
+      if (!ok) return;
+      r.courseIds.splice(idx, 1);
+      Admin.log('编辑', '学习路线「' + r.name + '」', '移除课程：' + (c ? c.title : idx));
+      msg = '课程已从路线移除';
+    } else return;
+    save();
+    openDetail(r.id);
+    UI.toast(msg, 'success');
+  });
+
+  /* ---------- 新建 / 编辑表单 ---------- */
+  document.getElementById('rSubject').innerHTML = subjects.map(s => `<option value="${s.id}">${UI.esc(s.name)}</option>`).join('');
+
+  function renderFormCourses() {
+    const subjectId = document.getElementById('rSubject').value;
+    const avail = courses.filter(c => c.subjectId === subjectId);
+    document.getElementById('availHint').textContent = `（${subjName(subjectId)} · ${avail.length} 门）`;
+    const box = document.getElementById('availableCourses');
+    box.innerHTML = avail.length ? avail.map(c => `
+      <label class="cp-course ${picked.includes(c.id) ? 'picked' : ''}">
+        <input type="checkbox" data-id="${c.id}" ${picked.includes(c.id) ? 'checked' : ''} />
+        <div class="cp-course-main">
+          <div class="cp-course-title ellipsis">${UI.esc(c.title)}</div>
+          <div class="cp-course-meta">${durText(c.minutes)} · ${UI.esc(c.bv || '无 BV 号')}</div>
+        </div>
+      </label>`).join('') : '<div class="cp-empty">该学科下暂无课程，请先到 B站课程库添加</div>';
+
+    const pickedBox = document.getElementById('pickedCourses');
+    document.getElementById('pickedHint').textContent = `（${picked.length} 门）`;
+    if (!picked.length) {
+      pickedBox.innerHTML = '<div class="cp-empty">从左侧勾选课程加入路线<br>建议按学习先后顺序添加</div>';
+    } else {
+      pickedBox.innerHTML = picked.map((id, i) => {
+        const c = courseMap[id];
+        return `<div class="cp-picked">
+          <span class="cpp-no">${i + 1}</span>
+          <div class="cp-course-main">
+            <div class="cp-course-title ellipsis">${UI.esc(c ? c.title : '课程已删除')}</div>
+            <div class="cp-course-meta">${c ? durText(c.minutes) : '—'}</div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-xs" data-move="up" data-idx="${i}" ${i === 0 ? 'disabled' : ''}>↑</button>
+          <button type="button" class="btn btn-ghost btn-xs" data-move="down" data-idx="${i}" ${i === picked.length - 1 ? 'disabled' : ''}>↓</button>
+          <button type="button" class="btn btn-ghost btn-xs" data-remove="${id}">✕</button>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  document.getElementById('availableCourses').addEventListener('change', e => {
+    const c = e.target.closest('input[data-id]'); if (!c) return;
+    if (c.checked) { if (!picked.includes(c.dataset.id)) picked.push(c.dataset.id); }
+    else picked = picked.filter(id => id !== c.dataset.id);
+    renderFormCourses();
+  });
+
+  document.getElementById('pickedCourses').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.remove) {
+      picked = picked.filter(id => id !== b.dataset.remove);
+      renderFormCourses();
+      return;
+    }
+    const idx = +b.dataset.idx;
+    if (b.dataset.move === 'up' && idx > 0) {
+      [picked[idx - 1], picked[idx]] = [picked[idx], picked[idx - 1]];
+    } else if (b.dataset.move === 'down' && idx < picked.length - 1) {
+      [picked[idx + 1], picked[idx]] = [picked[idx], picked[idx + 1]];
+    }
+    renderFormCourses();
+  });
+
+  document.getElementById('rSubject').addEventListener('change', () => {
+    picked = [];
+    renderFormCourses();
+  });
+
+  let formEnabled = true;
+  document.getElementById('rStatus').onclick = function () {
+    formEnabled = !formEnabled;
+    this.classList.toggle('on', formEnabled);
+    document.getElementById('rStatusText').textContent = formEnabled ? '启用' : '禁用';
+  };
+
+  function openForm(id) {
+    editingId = id || null;
+    const r = id ? routes.find(x => x.id === id) : null;
+    document.getElementById('routeModalTitle').textContent = r ? '编辑学习路线' : '新建学习路线';
+    document.getElementById('rName').value = r ? r.name : '';
+    document.getElementById('rSubject').value = r ? r.subjectId : subjects[0].id;
+    document.getElementById('rIcon').value = r ? (r.icon || '') : '🗺';
+    document.getElementById('rAudience').value = r ? (r.audience || '') : '';
+    document.getElementById('rDesc').value = r ? (r.desc || '') : '';
+    formEnabled = r ? r.enabled : true;
+    const sw = document.getElementById('rStatus');
+    sw.classList.toggle('on', formEnabled);
+    document.getElementById('rStatusText').textContent = formEnabled ? '启用' : '禁用';
+    picked = r ? (r.courseIds || []).filter(cid => courseMap[cid]) : [];
+    document.getElementById('f-rName').classList.remove('invalid');
+    document.getElementById('f-rSubject').classList.remove('invalid');
+    renderFormCourses();
+    UI.open('routeModal');
+    setTimeout(() => document.getElementById('rName').focus(), 100);
+  }
+
+  document.getElementById('newRouteBtn').onclick = () => openForm();
+  document.getElementById('rName').addEventListener('input', () => document.getElementById('f-rName').classList.remove('invalid'));
+
+  document.getElementById('routeSave').onclick = () => {
+    const name = document.getElementById('rName').value.trim();
+    const subjectId = document.getElementById('rSubject').value;
+    const okN = !!name, okS = !!subjectId;
+    document.getElementById('f-rName').classList.toggle('invalid', !okN);
+    document.getElementById('f-rSubject').classList.toggle('invalid', !okS);
+    if (!okN) { UI.toast('请输入路线名称', 'error'); return; }
+    if (!okS) { UI.toast('请选择关联学科', 'error'); return; }
+    const data = {
+      name, subjectId,
+      icon: document.getElementById('rIcon').value.trim() || '🗺',
+      audience: document.getElementById('rAudience').value.trim(),
+      desc: document.getElementById('rDesc').value.trim(),
+      enabled: formEnabled,
+      courseIds: picked.slice()
+    };
+    if (editingId) {
+      const r = routes.find(x => x.id === editingId);
+      Object.assign(r, data);
+      Admin.log('编辑', '学习路线「' + name + '」', `更新基本信息与课程顺序，共 ${picked.length} 门课程`);
+      UI.toast('路线已更新', 'success');
+    } else {
+      routes.unshift(Object.assign({ id: Admin.nextId('r') }, data));
+      Admin.log('新增', '学习路线「' + name + '」', `关联学科：${subjName(subjectId)}，共 ${picked.length} 门课程`);
+      UI.toast('路线已创建', 'success');
+    }
+    save();
+    UI.close('routeModal');
+    if (mode === 'detail' && editingId) openDetail(editingId);
+    else renderList();
+  };
+
+  /* ---------- 从课程库添加 ---------- */
+  function openAddCourses() {
+    addSelected = new Set();
+    document.getElementById('addCourseSearch').value = '';
+    renderAddCourses();
+    UI.open('addCourseModal');
+  }
+
+  function renderAddCourses() {
+    const r = routes.find(x => x.id === currentId); if (!r) return;
+    const kw = document.getElementById('addCourseSearch').value.trim().toLowerCase();
+    const own = [], other = [];
+    courses.forEach(c => {
+      if (kw && !c.title.toLowerCase().includes(kw)) return;
+      if (c.subjectId === r.subjectId) own.push(c); else other.push(c);
+    });
+    const group = (title, arr, cross) => {
+      if (!arr.length) return '';
+      return `<div class="acg">
+        <div class="acg-title">${title}<span>${arr.length} 门</span></div>
+        ${arr.map(c => {
+          const added = (r.courseIds || []).includes(c.id);
+          return `<label class="acg-row ${added ? 'added' : ''}">
+            <input type="checkbox" data-id="${c.id}" ${added ? 'disabled' : ''} ${addSelected.has(c.id) ? 'checked' : ''} />
+            <div class="cover-thumb" style="width:64px;height:38px;font-size:12px;background:${c.cover || DB.COVERS[0]}">▶</div>
+            <div style="flex:1;min-width:0">
+              <div class="cell-main ellipsis">${UI.esc(c.title)}</div>
+              <div class="small muted mt-8">${cross ? UI.esc(subjName(c.subjectId)) + ' · ' : ''}${durText(c.minutes)}</div>
+            </div>
+            ${added ? '<span class="badge badge-gray">已添加</span>' : ''}
+          </label>`;
+        }).join('')}
+      </div>`;
+    };
+    const html = group('本学科课程', own, false) + group('其他学科课程（跨学科补充）', other, true);
+    document.getElementById('addCourseGroups').innerHTML = html || '<div class="empty" style="padding:36px 20px"><div class="em-icon">🔍</div><div class="em-title">没有找到匹配的课程</div><div class="em-sub">试试其他关键词</div></div>';
+    updateAddHint();
+  }
+
+  function updateAddHint() {
+    document.getElementById('addSelectedHint').textContent = `已选择 ${addSelected.size} 门课程`;
+    document.getElementById('addSelectedConfirm').disabled = addSelected.size === 0;
+  }
+
+  document.getElementById('addCourseSearch').addEventListener('input', UI.debounce(renderAddCourses, 250));
+
+  document.getElementById('addCourseGroups').addEventListener('change', e => {
+    const c = e.target.closest('input[data-id]'); if (!c || c.disabled) return;
+    if (c.checked) addSelected.add(c.dataset.id); else addSelected.delete(c.dataset.id);
+    updateAddHint();
+  });
+
+  document.getElementById('addSelectedConfirm').onclick = () => {
+    const r = routes.find(x => x.id === currentId); if (!r) return;
+    addSelected.forEach(id => { if (!r.courseIds.includes(id)) r.courseIds.push(id); });
+    save();
+    Admin.log('编辑', '学习路线「' + r.name + '」', `从课程库添加 ${addSelected.size} 门课程`);
+    UI.close('addCourseModal');
+    openDetail(r.id);
+    UI.toast(`已添加 ${addSelected.size} 门课程`, 'success');
+  };
+
+  /* ---------- 预览 ---------- */
+  function openPreview(id) {
+    const r = routes.find(x => x.id === id); if (!r) return;
+    const subj = subjectMap[r.subjectId];
+    const cs = routeCourses(r);
+    document.getElementById('previewBody').innerHTML = `
+      <div class="pv-hero" style="background:linear-gradient(135deg, ${subj ? subj.color : '#6366f1'}, #7c3aed)">
+        <div class="pv-icon">${r.icon || (subj ? subj.icon : '🗺')}</div>
+        <div class="pv-kicker">${UI.esc(subjName(r.subjectId))} · 学习路线</div>
+        <h2>${UI.esc(r.name)}</h2>
+        <p>${UI.esc(r.desc || '暂无路线描述')}</p>
+        <div class="pv-meta">
+          <span>👥 ${UI.esc(r.audience || '所有学员')}</span>
+          <span>🎬 ${cs.length} 门课程</span>
+          <span>⏱ ${durText(totalMin(r))}</span>
+        </div>
+      </div>
+      <div class="pv-body">
+        <div class="row-between mb-16">
+          <span class="title-sm">课程清单</span>
+          ${r.enabled ? '<span class="badge badge-success">已启用</span>' : '<span class="badge badge-gray">已禁用</span>'}
+        </div>
+        ${cs.length ? cs.map((c, i) => `
+          <div class="pv-course">
+            <span class="pv-no">${String(i + 1).padStart(2, '0')}</span>
+            <div style="flex:1;min-width:0">
+              <div class="cell-main">${UI.esc(c.title)}</div>
+              <div class="small muted mt-8">${UI.esc(c.bv || '')} · ${c.minutes} 分钟 · ${Admin.formatNum(c.plays || 0)} 播放</div>
+            </div>
+            <span class="badge badge-outline">去 B 站学习 ↗</span>
+          </div>`).join('') : '<div class="empty" style="padding:28px"><div class="em-title">暂无课程</div><div class="em-sub">该路线还没有配置课程</div></div>'}
+      </div>`;
+    UI.open('previewModal');
+  }
+
+  /* ---------- 初始化 ---------- */
+  renderList();
+  if (new URLSearchParams(location.search).get('new') === '1' && Admin.can('create')) {
+    setTimeout(() => openForm(), 200);
+  }
+})();
+</script>
+<style>
+  .route-grid { grid-template-columns: repeat(3, 1fr); }
+  .detail-topbar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .form-grid.cols-3 { grid-template-columns: 1fr 1.5fr 1fr; }
+  .course-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .cp-panel { border: 1px solid var(--line); border-radius: 11px; overflow: hidden; background: #fcfcfe; }
+  .cp-head { padding: 10px 13px; background: #f7f8fc; border-bottom: 1px solid var(--line); font-size: 12.5px; font-weight: 700; color: var(--text-2); display: flex; justify-content: space-between; }
+  .cp-list { height: 270px; overflow-y: auto; padding: 7px; }
+  .cp-course { display: flex; gap: 9px; align-items: flex-start; padding: 8px 9px; border-radius: 8px; cursor: pointer; }
+  .cp-course:hover { background: #f5f6fb; }
+  .cp-course.picked { background: var(--brand-soft); }
+  .cp-course input { accent-color: var(--brand); margin-top: 3px; flex: none; }
+  .cp-course-main { flex: 1; min-width: 0; }
+  .cp-course-title { font-size: 12.5px; font-weight: 600; }
+  .cp-course-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .cp-empty { padding: 30px 14px; text-align: center; font-size: 12px; color: var(--muted-2); line-height: 1.8; }
+  .cp-picked { display: flex; align-items: center; gap: 6px; padding: 7px 6px; border-bottom: 1px dashed var(--line); }
+  .cp-picked:last-child { border-bottom: 0; }
+  .cpp-no { width: 20px; height: 20px; border-radius: 5px; background: var(--brand-soft); color: var(--brand); font-size: 10.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
+  .cp-picked .btn { flex: none; padding: 2px 5px; }
+  .cp-picked .btn:disabled { opacity: .3; }
+  .admin-shell .switch:disabled { opacity: .4; }
+  .acg { margin-bottom: 16px; }
+  .acg-title { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; display: flex; gap: 8px; align-items: center; }
+  .acg-title span { font-weight: 500; color: var(--muted-2); }
+  .acg-row { display: flex; align-items: center; gap: 11px; padding: 8px 10px; border-radius: 9px; cursor: pointer; }
+  .acg-row:hover { background: #f8f9fc; }
+  .acg-row.added { opacity: .62; cursor: default; }
+  .acg-row input { accent-color: var(--brand); flex: none; }
+  .pv-hero { border-radius: 14px; padding: 26px; color: #fff; position: relative; overflow: hidden; }
+  .pv-hero::after { content: ""; position: absolute; width: 250px; height: 250px; border-radius: 50%; background: rgba(255,255,255,.08); right: -70px; top: -90px; }
+  .pv-icon { width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,.16); display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 12px; }
+  .pv-kicker { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; }
+  .pv-hero h2 { font-size: 21px; font-weight: 800; margin-top: 5px; }
+  .pv-hero p { font-size: 12.5px; opacity: .82; line-height: 1.75; margin-top: 7px; max-width: 560px; }
+  .pv-meta { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; margin-top: 14px; opacity: .9; }
+  .pv-body { padding: 20px 2px 2px; }
+  .pv-course { display: flex; align-items: center; gap: 13px; padding: 12px 10px; border-bottom: 1px dashed var(--line); }
+  .pv-course:last-child { border-bottom: 0; }
+  .pv-no { width: 28px; height: 28px; border-radius: 8px; background: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex: none; }
+  @media (max-width: 1080px) {
+    .course-picker { grid-template-columns: 1fr; }
+    .form-grid.cols-3 { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</body>
+</html>

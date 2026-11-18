@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>云枢智学 · AI 赋能的智能面试训练平台</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/portal.css">
+</head>
+<body>
+
+<div id="siteHeader"></div>
+
+<!-- ================= Hero ================= -->
+<section class="hero">
+  <div class="container-wide inner">
+    <div>
+      <span class="eyebrow">✦ AI 模拟面试 · 全新上线</span>
+      <h1 class="mt-16">学得会，更要<br><span class="grad-text">面得过</span></h1>
+      <p class="hero-sub">按学习路线系统学、按阶段刷题验证、用 AI 模拟面试检验成果。从知识输入到能力证明，一条闭环帮你把「学过」变成「能讲清楚」。</p>
+      <div class="hero-actions">
+        <a class="btn btn-grad btn-lg" href="questions.html">海量题库 <span style="opacity:.7">→</span></a>
+        <a class="btn btn-outline btn-lg" href="interview-config.html">开始 AI 面试</a>
+      </div>
+      <div class="hero-stats">
+        <div><div class="num"><span class="cnt" data-target="2860">0</span><span>+</span></div><div class="lab">精选面试题</div></div>
+        <div><div class="num"><span class="cnt" data-target="12480">0</span><span>+</span></div><div class="lab">注册学员</div></div>
+        <div><div class="num"><span class="cnt" data-target="38600">0</span><span>+</span></div><div class="lab">AI 面试次数</div></div>
+        <div><div class="num"><span class="cnt" data-target="98">0</span><span>%</span></div><div class="lab">学员好评率</div></div>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="hero-float f1"><span style="font-size:16px">🔥</span> 连续学习 7 天</div>
+      <div class="hero-float f2"><span style="font-size:16px">📈</span> 本周正确率 86%</div>
+      <div class="hero-card">
+        <div class="hc-head">
+          <span class="iv-avatar" style="width:34px;height:34px;border-radius:10px;background:var(--grad);color:#fff;display:flex;align-items:center;justify-content:center">🤖</span>
+          <div style="flex:1">
+            <div class="hc-title">AI 面试官 · 中等难度</div>
+            <div class="hc-sub">AI应用与智能体开发 · 第 3 / 8 题</div>
+          </div>
+          <span class="badge badge-success"><span class="dot"></span>在线</span>
+        </div>
+        <div class="hero-chat">
+          <div class="hbubble ai">在 RAG 系统中，你会如何提升召回质量？请结合具体做法说明。</div>
+          <div class="hbubble me">我会采用混合检索：向量召回 + BM25 关键词召回，再融合排序；同时做查询改写扩大语义覆盖，最后用 Rerank 模型精排 Top-K。</div>
+          <div class="hbubble ai">回答结构清晰。能再补充一下如何评估检索效果吗？</div>
+        </div>
+        <div class="hero-score">
+          <div class="sc">8.6</div>
+          <div style="font-size:12px;color:#027a48;line-height:1.6"><b>本题评分 · 优秀</b><br><span style="color:#66997e">召回策略 + 评测指标均覆盖</span></div>
+          <span class="badge badge-success" style="margin-left:auto">+12</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 快速开始 ================= -->
+<section class="home-section">
+  <div class="container-wide">
+    <div class="section-head reveal">
+      <div>
+        <h2 class="title-lg">快速开始</h2>
+        <p class="sub">不知道从哪开始？选一个动作，立刻进入状态</p>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="profile.html">查看学习数据 →</a>
+    </div>
+    <div class="grid-4">
+      <div class="quick-card reveal" data-go="roadmap.html">
+        <div class="q-icon" style="background:#fff7ed;color:#f79009">🗺</div>
+        <h4>规划学习路线</h4>
+        <p>按学科选择成体系的课程</p>
+        <span class="arrow">→</span>
+      </div>
+      <div class="quick-card reveal" data-go="practice.html?stage=agent-1&mode=random&count=10" style="transition-delay:.05s">
+        <div class="q-icon" style="background:#eef2ff;color:#4f46e5">🎲</div>
+        <h4>随机练习 10 题</h4>
+        <p>打乱顺序，快速热身</p>
+        <span class="arrow">→</span>
+      </div>
+      <div class="quick-card reveal" data-go="practice.html?resume=1" style="transition-delay:.1s">
+        <div class="q-icon" style="background:#ecfdf3;color:#12b76a">⏱</div>
+        <h4>继续上次学习</h4>
+        <p>接着上次的练习进度继续</p>
+        <span class="arrow">→</span>
+      </div>
+      <div class="quick-card reveal" data-go="interview-config.html" style="transition-delay:.15s">
+        <div class="q-icon" style="background:#f5f3ff;color:#7c3aed">🤖</div>
+        <h4>开始 AI 面试</h4>
+        <p>选定方向与难度，立即开面</p>
+        <span class="arrow">→</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 核心功能 ================= -->
+<section class="home-section">
+  <div class="container-wide">
+    <div class="section-head reveal">
+      <div>
+        <h2 class="title-lg">核心功能</h2>
+        <p class="sub">覆盖「学 · 练 · 面 · 复盘」的完整闭环</p>
+      </div>
+    </div>
+    <div class="grid-4">
+      <div class="feature-card reveal" data-go="roadmap.html">
+        <div class="f-icon" style="background:#fff7ed">🧭</div>
+        <h4>学习路线</h4>
+        <p>由一线工程师编排的 B 站课程路线，按顺序学，不再东拼西凑。</p>
+        <span class="f-link">看路线 →</span>
+      </div>
+      <div class="feature-card reveal" data-go="questions.html" style="transition-delay:.05s">
+        <div class="f-icon" style="background:#eef2ff">📚</div>
+        <h4>海量题库</h4>
+        <p>8 大学科、按阶段组织的精选题目，覆盖单选、多选、判断与简答。</p>
+        <span class="f-link">去刷题 →</span>
+      </div>
+      <div class="feature-card reveal" data-go="practice.html?stage=agent-1" style="transition-delay:.1s">
+        <div class="f-icon" style="background:#ecfdf3">✍️</div>
+        <h4>刷题练习</h4>
+        <p>顺序 / 随机双模式，答题卡、计时、AI 简答批改与逐题解析一应俱全。</p>
+        <span class="f-link">去练习 →</span>
+      </div>
+      <div class="feature-card reveal" data-go="interview-config.html" style="transition-delay:.15s">
+        <div class="f-icon" style="background:#f5f3ff">🎙</div>
+        <h4>AI 模拟面试</h4>
+        <p>真实对话式面试体验，逐题实时评分，结束后生成多维能力报告。</p>
+        <span class="f-link">去面试 →</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 学习统计 + 近 7 天 ================= -->
+<section class="home-section">
+  <div class="container-wide">
+    <div class="section-head reveal">
+      <div>
+        <h2 class="title-lg">学习统计</h2>
+        <p class="sub">你的每一次练习，都在缩短与 Offer 的距离</p>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="profile.html">查看全部 →</a>
+    </div>
+    <div class="stats-panel reveal">
+      <div class="card card-pad">
+        <div class="row-between mb-16">
+          <span class="title-sm">我的数据</span>
+          <span class="badge badge-brand">近 30 天</span>
+        </div>
+        <div style="display:grid;gap:14px">
+          <div class="stat-mini" style="display:flex;align-items:center;gap:14px;padding:14px 16px">
+            <span style="font-size:24px">🔥</span>
+            <div><div class="n">7 <span style="font-size:13px;color:var(--muted);font-weight:600">天</span></div><div class="l">连续学习天数</div></div>
+          </div>
+          <div class="stat-mini" style="display:flex;align-items:center;gap:14px;padding:14px 16px">
+            <span style="font-size:24px">🎯</span>
+            <div><div class="n">86<span style="font-size:15px;color:var(--muted)">%</span></div><div class="l">平均正确率</div></div>
+          </div>
+          <div class="stat-mini" style="display:flex;align-items:center;gap:14px;padding:14px 16px">
+            <span style="font-size:24px">📝</span>
+            <div><div class="n">386</div><div class="l">累计练习题目</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card card-pad">
+        <div class="row-between mb-8">
+          <span class="title-sm">近 7 天练习</span>
+          <span class="badge badge-success">今日已刷 <b style="margin:0 2px">16</b> 题</span>
+        </div>
+        <div class="chart-bars" id="weekBars"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 热门阶段 ================= -->
+<section class="home-section">
+  <div class="container-wide">
+    <div class="section-head reveal">
+      <div>
+        <h2 class="title-lg">热门阶段</h2>
+        <p class="sub">学员练得最多的阶段，往往是面试的高频考点</p>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="questions.html">浏览全部题库 →</a>
+    </div>
+    <div class="grid-4" id="hotStages"></div>
+  </div>
+</section>
+
+<!-- ================= AI 面试介绍 ================= -->
+<section class="home-section">
+  <div class="container-wide">
+    <div class="ai-section reveal">
+      <div class="inner">
+        <div>
+          <span class="eyebrow" style="background:rgba(255,255,255,.1);color:#c7d2fe">AI INTERVIEW</span>
+          <h2 class="mt-16">像真实面试一样<br>被追问、被评估</h2>
+          <p class="sub">不是背题库。AI 面试官会根据你的回答继续追问，逐题打分，并在结束后给出 6 个维度的能力分析与可执行的提升建议。</p>
+          <div class="ai-points">
+            <div class="ap"><span class="ap-i">🎯</span><div><b>智能出题</b><span>按方向与难度动态组卷</span></div></div>
+            <div class="ap"><span class="ap-i">⚡</span><div><b>实时评分</b><span>每题 0-10 分即时反馈</span></div></div>
+            <div class="ap"><span class="ap-i">📊</span><div><b>面试报告</b><span>多维能力分析与建议</span></div></div>
+            <div class="ap"><span class="ap-i">📚</span><div><b>海量知识</b><span>覆盖 8 大 AI 技术方向</span></div></div>
+          </div>
+          <a class="btn btn-grad btn-lg mt-24" href="interview-config.html">立即体验 <span style="opacity:.75">→</span></a>
+        </div>
+        <div class="demo-chat">
+          <div class="dc-head"><span>🤖</span> AI 面试官 <span style="margin-left:auto;color:#4ade80">● 面试进行中</span></div>
+          <div class="dc-body">
+            <div class="db ai">请介绍一下 LoRA 微调的原理，以及你在项目中如何选择秩 r？</div>
+            <div class="db me">LoRA 冻结原模型权重，只训练低秩分解的旁路矩阵 A 和 B，大幅降低训练成本。秩 r 一般从 8 开始，根据任务复杂度和数据量调整……</div>
+            <div class="db ai">如果训练中出现明显的过拟合，你会优先调整哪些参数？</div>
+          </div>
+          <div class="dc-score">
+            <div style="font-size:12px;color:#a7f3c0">本题评分 · 良好</div>
+            <b>7.8</b>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="siteFooter"></div>
+
+<!-- ================= 新手引导 ================= -->
+<div class="modal-mask" id="guideModal" data-static="1">
+  <div class="modal modal-sm">
+    <div class="modal-body" style="padding:26px 28px 10px">
+      <div class="onboard-card" id="guideBody"></div>
+    </div>
+    <div class="modal-foot" style="justify-content:space-between;padding:10px 28px 24px">
+      <button class="btn btn-ghost" id="guideSkip">跳过引导</button>
+      <button class="btn btn-primary" id="guideNext">下一步</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script>
+(function () {
+  UI.renderHeader('home');
+  UI.renderFooter();
+  UI.bindModals();
+
+  /* ---- 数字递增 ---- */
+  document.querySelectorAll('.cnt').forEach((el, i) => {
+    setTimeout(() => UI.animateCount(el, +el.dataset.target, 1400), 120 + i * 90);
+  });
+
+  /* ---- 快速入口 ---- */
+  document.querySelectorAll('[data-go]').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', () => location.href = el.dataset.go);
+  });
+
+  /* ---- 近 7 天柱状图 ---- */
+  const max = Math.max(...DB.WEEK_PRACTICE.map(d => d.value));
+  document.getElementById('weekBars').innerHTML = DB.WEEK_PRACTICE.map(d => `
+    <div class="bar-col" title="${d.label} 练习 ${d.value} 题">
+      <div class="bar ${d.today ? 'today' : ''}" style="height:${Math.max(8, d.value / max * 100)}%">
+        <span class="bval">${d.value}</span>
+      </div>
+      <span class="blabel ${d.today ? 'today' : ''}">${d.label}</span>
+    </div>`).join('');
+
+  /* ---- 热门阶段 ---- */
+  const hot = [];
+  DB.SUBJECTS.slice(0, 4).forEach(s => {
+    s.stages.slice(0, 2).forEach(st => hot.push({ s, st }));
+  });
+  document.getElementById('hotStages').innerHTML = hot.map(({ s, st }) => `
+    <div class="hot-stage reveal" data-subject="${s.id}" data-stage="${st.id}">
+      <div class="s-icon" style="background:${s.soft};color:${s.color}">${st.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;line-height:1.45">${UI.esc(st.name)}</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${UI.esc(s.name)} · 共 ${st.questions.length} 题</div>
+      </div>
+      <span style="color:var(--muted-2)">›</span>
+    </div>`).join('');
+  document.querySelectorAll('.hot-stage').forEach(el => {
+    el.addEventListener('click', () => {
+      location.href = `questions.html?subject=${el.dataset.subject}&stage=${el.dataset.stage}`;
+    });
+  });
+
+  UI.initReveal();
+
+  /* ---- 新手引导 ---- */
+  const steps = [
+    { icon: '🧭', title: '选择技术方向', desc: '8 大 AI 技术方向，从智能体开发到 AI 短剧创作，先定方向再出发。' },
+    { icon: '✍️', title: '开始刷题练习', desc: '按学科 → 阶段逐层练习，答题卡、解析与错题本帮你吃透每个考点。' },
+    { icon: '🎙', title: 'AI 面试检验', desc: '用一场模拟面试检验成果，拿到逐题评分与能力报告，针对性补强。' }
+  ];
+  let guideStep = 0;
+  const guideBody = document.getElementById('guideBody');
+  const nextBtn = document.getElementById('guideNext');
+  function renderGuide() {
+    const s = steps[guideStep];
+    guideBody.innerHTML = `
+      <div class="onboard-visual">${s.icon}</div>
+      <div style="font-size:19px;font-weight:800">${s.title}</div>
+      <div style="color:var(--muted);font-size:13px;line-height:1.8;margin-top:8px;max-width:300px;margin-left:auto;margin-right:auto">${s.desc}</div>
+      <div class="onboard-dots">${steps.map((_, i) => `<i class="${i === guideStep ? 'on' : ''}"></i>`).join('')}</div>
+      <div style="font-size:11.5px;color:var(--muted-2);margin-top:10px">第 ${guideStep + 1} 步 / 共 3 步</div>`;
+    nextBtn.textContent = guideStep === steps.length - 1 ? '开始学习' : '下一步';
+  }
+  function finishGuide() {
+    UI.Store.set('guide_done', true);
+    UI.close('guideModal');
+  }
+  renderGuide();
+  nextBtn.addEventListener('click', () => {
+    if (guideStep < steps.length - 1) { guideStep++; renderGuide(); }
+    else { finishGuide(); location.href = 'questions.html'; }
+  });
+  document.getElementById('guideSkip').addEventListener('click', finishGuide);
+
+  if (!UI.Store.get('guide_done', false)) {
+    setTimeout(() => UI.open('guideModal'), 700);
+  }
+})();
+</script>
+</body>
+</html>

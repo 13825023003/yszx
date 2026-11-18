@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>学科管理 · 云枢智学管理端</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+  <div id="adminAsideMount"></div>
+  <div class="admin-main">
+    <div id="adminTopbarMount"></div>
+    <main class="admin-content">
+
+      <div class="page-head">
+        <div>
+          <h1>学科管理</h1>
+          <div class="desc">维护前台展示的学科与学习阶段，排序号越小越靠前</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary btn-sm" id="addSubjectBtn" data-perm="create">+ 新增学科</button>
+        </div>
+      </div>
+
+      <div class="admin-stats" id="subjectStats"></div>
+
+      <div id="subjectList"></div>
+
+    </main>
+  </div>
+</div>
+
+<!-- 学科表单 -->
+<div class="modal-mask" id="subjectModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3 id="subjModalTitle">新增学科</h3>
+        <div class="sub">学科将展示在学员前台的题库与学习路线中</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-grid cols-2">
+          <div class="field" id="f-subjName">
+            <label class="req">学科名称</label>
+            <input class="input" id="subjName" maxlength="20" placeholder="如：AI应用与智能体开发" />
+            <div class="err-text">请输入学科名称</div>
+          </div>
+          <div class="field" id="f-subjIcon">
+            <label class="req">学科图标（Emoji）</label>
+            <input class="input" id="subjIcon" maxlength="4" placeholder="如：🤖" />
+            <div class="err-text">请输入一个 Emoji 图标</div>
+          </div>
+        </div>
+        <div class="field" id="f-subjDesc">
+          <label class="req">学科描述</label>
+          <textarea class="textarea" id="subjDesc" rows="3" maxlength="120" placeholder="一句话说明该学科的学习内容与目标"></textarea>
+          <div class="err-text">请输入学科描述</div>
+        </div>
+        <div class="form-grid cols-2">
+          <div class="field" id="f-subjOrder">
+            <label class="req">排序号</label>
+            <input class="input" id="subjOrder" type="number" min="1" placeholder="数字越小越靠前" />
+            <div class="err-text">请输入大于 0 的排序号</div>
+          </div>
+          <div class="field">
+            <label class="req">主题颜色</label>
+            <div class="color-palette" id="colorPalette"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="subjSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 阶段表单 -->
+<div class="modal-mask" id="stageModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3 id="stageModalTitle">添加阶段</h3>
+        <div class="sub" id="stageSubjHint"></div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-grid cols-2">
+          <div class="field" id="f-stageName">
+            <label class="req">阶段名称</label>
+            <input class="input" id="stageName" maxlength="30" placeholder="如：RAG 知识库构建" />
+            <div class="err-text">请输入阶段名称</div>
+          </div>
+          <div class="field">
+            <label>阶段图标</label>
+            <input class="input" id="stageIcon" maxlength="4" placeholder="留空默认 📘" />
+          </div>
+        </div>
+        <div class="field" id="f-stageOrder">
+          <label>排序号</label>
+          <input class="input" id="stageOrder" type="number" min="1" placeholder="留空默认追加到末尾" />
+          <div class="hint">数字越小越靠前</div>
+          <div class="err-text">排序号需为大于 0 的数字</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="stageSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script>
+(function () {
+  if (!Admin.renderShell('subjects')) return;
+  UI.bindModals();
+
+  let subjects = Admin.copy(Admin.getSubjects());
+  subjects.forEach((s, i) => {
+    if (!s.order) s.order = i + 1;
+    s.stages.forEach((st, j) => { if (!st.order) st.order = j + 1; });
+  });
+  let courses = Admin.getCourses();
+  let routes = Admin.getRoutes();
+  let editSubjectId = null;
+  let editStageSubjectId = null;
+  let editStageId = null;
+  let pickedColor = '#6366f1';
+
+  const COLORS = ['#6366f1', '#8b5cf6', '#0ea5e9', '#14b8a6', '#10b981', '#f59e0b', '#ec4899', '#f43f5e'];
+  const SOFT = { '#6366f1': '#eef2ff', '#8b5cf6': '#f5f3ff', '#0ea5e9': '#f0f9ff', '#14b8a6': '#f0fdfa', '#10b981': '#ecfdf5', '#f59e0b': '#fffbeb', '#ec4899': '#fdf2f8', '#f43f5e': '#fff1f2' };
+
+  const sorted = () => subjects.slice().sort((a, b) => (a.order || 99) - (b.order || 99));
+  const qCount = s => s.stages.reduce((n, st) => n + st.questions.length, 0);
+  const save = silent => {
+    subjects.forEach((s, i) => { if (!s.order) s.order = i + 1; });
+    Admin.saveSubjects(subjects);
+    render();
+    if (!silent) UI.toast('已保存', 'success');
+  };
+
+  /* ---------- 统计 ---------- */
+  function renderStats() {
+    const totalStages = subjects.reduce((n, s) => n + s.stages.length, 0);
+    const totalQ = subjects.reduce((n, s) => n + qCount(s), 0);
+    const withStages = subjects.filter(s => s.stages.length > 0).length;
+    const data = [
+      { label: '总学科数', value: subjects.length, icon: '📚', bg: '#eef2ff' },
+      { label: '有阶段的学科', value: withStages, icon: '🧩', bg: '#f0f9ff' },
+      { label: '阶段总数', value: totalStages, icon: '🪜', bg: '#f5f3ff' },
+      { label: '题目总数', value: totalQ, icon: '📝', bg: '#ecfdf5' }
+    ];
+    document.getElementById('subjectStats').innerHTML = data.map(s => `
+      <div class="a-stat">
+        <div class="as-top"><span class="as-label">${s.label}</span><span class="as-icon" style="background:${s.bg}">${s.icon}</span></div>
+        <div class="as-num">${s.value.toLocaleString()}</div>
+        <div class="as-trend">共 ${subjects.length} 个学科 · 数据实时统计</div>
+      </div>`).join('');
+  }
+
+  /* ---------- 列表 ---------- */
+  function render() {
+    renderStats();
+    const list = sorted();
+    const box = document.getElementById('subjectList');
+    if (!list.length) {
+      box.innerHTML = `<div class="a-card"><div class="empty">
+        <div class="em-icon">📚</div><div class="em-title">暂未创建学科</div>
+        <div class="em-sub">点击右上角「新增学科」创建第一个学科</div>
+      </div></div>`;
+      return;
+    }
+    box.innerHTML = list.map((s, idx) => {
+      const stageCount = s.stages.length;
+      const courseCount = courses.filter(c => c.subjectId === s.id).length;
+      const routeCount = routes.filter(r => r.subjectId === s.id).length;
+      const enabledStages = s.stages.filter(st => st.enabled !== false).length;
+      return `
+      <div class="subj-card" data-id="${s.id}">
+        <div class="sc-head2">
+          <div class="sc2-icon" style="background:${s.soft || SOFT[s.color] || '#eef2ff'}">${s.icon || '📘'}</div>
+          <div style="flex:1;min-width:0">
+            <div class="sc2-name">${UI.esc(s.name)}
+              <span class="badge badge-outline">排序 #${s.order}</span>
+              ${s.stages.some(st => st.enabled === false) ? '<span class="badge badge-gray">含已禁用阶段</span>' : ''}
+            </div>
+            <div class="sc2-desc">${UI.esc(s.desc || '')}</div>
+            <div class="sc2-stats">
+              <span>课程 <b>${courseCount}</b></span>
+              <span>学习路线 <b>${routeCount}</b></span>
+              <span>阶段 <b>${stageCount}</b>${stageCount !== enabledStages ? `（启用 ${enabledStages}）` : ''}</span>
+              <span>题目 <b>${qCount(s)}</b></span>
+            </div>
+          </div>
+          <div class="sc2-actions">
+            <button class="btn btn-ghost btn-xs" data-act="subj-up" ${idx === 0 ? 'disabled' : ''} title="上移">↑</button>
+            <button class="btn btn-ghost btn-xs" data-act="subj-down" ${idx === list.length - 1 ? 'disabled' : ''} title="下移">↓</button>
+            <button class="btn btn-outline btn-xs" data-act="subj-edit" data-perm="edit">编辑学科</button>
+            <button class="btn btn-danger-soft btn-xs" data-act="subj-del" data-perm="delete">删除</button>
+          </div>
+        </div>
+        <div class="stage-list">
+          ${s.stages.length ? s.stages.map((st, si) => `
+            <div class="stage-line ${st.enabled === false ? 'is-off' : ''}">
+              <span class="sl-icon">${st.icon || '📘'}</span>
+              <span class="sl-n">${UI.esc(st.name)}</span>
+              <span class="sl-meta">${st.questions.length} 题 · 排序 ${st.order || si + 1}</span>
+              ${st.enabled === false ? '<span class="badge badge-gray">已禁用</span>' : '<span class="badge badge-success">已启用</span>'}
+              <span class="sl-actions">
+                <button class="btn btn-ghost btn-xs" data-act="stage-up" data-stage="${st.id}" ${si === 0 ? 'disabled' : ''} title="上移">↑</button>
+                <button class="btn btn-ghost btn-xs" data-act="stage-down" data-stage="${st.id}" ${si === s.stages.length - 1 ? 'disabled' : ''} title="下移">↓</button>
+                <button class="btn btn-ghost btn-xs" data-act="stage-toggle" data-stage="${st.id}" data-perm="edit">${st.enabled === false ? '启用' : '禁用'}</button>
+                <button class="btn btn-ghost btn-xs" data-act="stage-edit" data-stage="${st.id}" data-perm="edit">编辑</button>
+                <button class="btn btn-ghost btn-xs danger-text" data-act="stage-del" data-stage="${st.id}" data-perm="delete">删除</button>
+              </span>
+            </div>`).join('') : '<div class="stage-empty">该学科还没有学习阶段，添加阶段后才能录入题目</div>'}
+          <button class="subj-add" data-act="stage-add" data-perm="create">＋ 添加阶段</button>
+        </div>
+      </div>`;
+    }).join('');
+    Admin.applyPermissions();
+  }
+
+  /* ---------- 学科表单 ---------- */
+  const subjectModal = document.getElementById('subjectModal');
+  function openSubjectModal(id) {
+    editSubjectId = id || null;
+    const s = id ? subjects.find(x => x.id === id) : null;
+    document.getElementById('subjModalTitle').textContent = s ? '编辑学科' : '新增学科';
+    document.getElementById('subjName').value = s ? s.name : '';
+    document.getElementById('subjIcon').value = s ? s.icon : '';
+    document.getElementById('subjDesc').value = s ? s.desc : '';
+    document.getElementById('subjOrder').value = s ? s.order : subjects.length + 1;
+    pickedColor = s ? s.color : COLORS[Math.floor(Math.random() * COLORS.length)];
+    document.querySelectorAll('#colorPalette button').forEach(b => b.classList.toggle('active', b.dataset.color === pickedColor));
+    ['f-subjName', 'f-subjIcon', 'f-subjDesc', 'f-subjOrder'].forEach(f => document.getElementById(f).classList.remove('invalid'));
+    UI.open(subjectModal);
+    setTimeout(() => document.getElementById('subjName').focus(), 100);
+  }
+
+  document.getElementById('addSubjectBtn').onclick = () => openSubjectModal();
+
+  function renderPalette() {
+    document.getElementById('colorPalette').innerHTML = COLORS.map(c =>
+      `<button type="button" class="${c === pickedColor ? 'active' : ''}" data-color="${c}" style="background:${c}"></button>`).join('');
+  }
+  renderPalette();
+  document.getElementById('colorPalette').addEventListener('click', e => {
+    const b = e.target.closest('button[data-color]'); if (!b) return;
+    pickedColor = b.dataset.color;
+    document.querySelectorAll('#colorPalette button').forEach(x => x.classList.toggle('active', x === b));
+  });
+
+  document.getElementById('subjSave').onclick = () => {
+    const name = document.getElementById('subjName').value.trim();
+    const icon = document.getElementById('subjIcon').value.trim();
+    const desc = document.getElementById('subjDesc').value.trim();
+    const order = parseInt(document.getElementById('subjOrder').value, 10);
+    const okName = !!name, okIcon = !!icon, okDesc = !!desc, okOrder = order > 0;
+    document.getElementById('f-subjName').classList.toggle('invalid', !okName);
+    document.getElementById('f-subjIcon').classList.toggle('invalid', !okIcon);
+    document.getElementById('f-subjDesc').classList.toggle('invalid', !okDesc);
+    document.getElementById('f-subjOrder').classList.toggle('invalid', !okOrder);
+    if (!okName || !okIcon || !okDesc || !okOrder) { UI.toast('请完善学科信息', 'error'); return; }
+
+    if (editSubjectId) {
+      const s = subjects.find(x => x.id === editSubjectId);
+      Object.assign(s, { name, icon, desc, order, color: pickedColor, soft: SOFT[pickedColor] || '#eef2ff' });
+      Admin.log('编辑', '学科「' + name + '」', '更新学科基本信息');
+      UI.toast('学科已更新', 'success');
+    } else {
+      subjects.push({
+        id: Admin.nextId('subj'), name, icon, desc, order,
+        color: pickedColor, soft: SOFT[pickedColor] || '#eef2ff', stages: []
+      });
+      Admin.log('新增', '学科「' + name + '」', '创建新学科');
+      UI.toast('学科已创建', 'success');
+    }
+    UI.close(subjectModal);
+    save(true);
+  };
+
+  /* ---------- 阶段表单 ---------- */
+  const stageModal = document.getElementById('stageModal');
+  function openStageModal(subjectId, stageId) {
+    editStageSubjectId = subjectId;
+    editStageId = stageId || null;
+    const s = subjects.find(x => x.id === subjectId);
+    const st = stageId ? s.stages.find(x => x.id === stageId) : null;
+    document.getElementById('stageModalTitle').textContent = st ? '编辑阶段' : '添加阶段';
+    document.getElementById('stageSubjHint').textContent = '所属学科：' + s.name;
+    document.getElementById('stageName').value = st ? st.name : '';
+    document.getElementById('stageIcon').value = st ? (st.icon || '') : '';
+    document.getElementById('stageOrder').value = st ? (st.order || s.stages.indexOf(st) + 1) : s.stages.length + 1;
+    document.getElementById('f-stageName').classList.remove('invalid');
+    document.getElementById('f-stageOrder').classList.remove('invalid');
+    UI.open(stageModal);
+    setTimeout(() => document.getElementById('stageName').focus(), 100);
+  }
+
+  document.getElementById('stageSave').onclick = () => {
+    const s = subjects.find(x => x.id === editStageSubjectId);
+    if (!s) return;
+    const name = document.getElementById('stageName').value.trim();
+    const icon = document.getElementById('stageIcon').value.trim() || '📘';
+    const rawOrder = document.getElementById('stageOrder').value.trim();
+    const order = rawOrder ? parseInt(rawOrder, 10) : s.stages.length + 1;
+    const okName = !!name, okOrder = order > 0;
+    document.getElementById('f-stageName').classList.toggle('invalid', !okName);
+    document.getElementById('f-stageOrder').classList.toggle('invalid', !okOrder);
+    if (!okName || !okOrder) { UI.toast('请完善阶段信息', 'error'); return; }
+
+    if (editStageId) {
+      const st = s.stages.find(x => x.id === editStageId);
+      Object.assign(st, { name, icon, order });
+      Admin.log('编辑', '阶段「' + name + '」', '所属学科：' + s.name);
+      UI.toast('阶段已更新', 'success');
+    } else {
+      s.stages.push({ id: Admin.nextId('stage'), name, icon, order, enabled: true, questions: [] });
+      Admin.log('新增', '阶段「' + name + '」', '所属学科：' + s.name);
+      UI.toast('阶段已添加', 'success');
+    }
+    UI.close(stageModal);
+    save(true);
+  };
+
+  /* ---------- 事件委托 ---------- */
+  document.getElementById('subjectList').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn || btn.disabled) return;
+    const card = btn.closest('.subj-card');
+    const sid = card.dataset.id;
+    const s = subjects.find(x => x.id === sid);
+    if (!s) return;
+    const act = btn.dataset.act;
+    const list = sorted();
+    const idx = list.findIndex(x => x.id === sid);
+
+    if (act === 'subj-up' || act === 'subj-down') {
+      const ti = idx + (act === 'subj-up' ? -1 : 1);
+      if (ti < 0 || ti >= list.length) return;
+      const tmp = list[idx]; list[idx] = list[ti]; list[ti] = tmp;
+      list.forEach((x, i) => x.order = i + 1);
+      subjects = list;
+      save(true);
+      return;
+    }
+
+    if (act === 'subj-edit') { openSubjectModal(sid); return; }
+
+    if (act === 'subj-del') {
+      const qn = qCount(s), sn = s.stages.length;
+      let msg, title = '删除学科';
+      if (qn > 0) msg = `学科「${s.name}」下有 ${sn} 个阶段、${qn} 道题目，删除后这些阶段与题目将一并移除，且不可恢复。`;
+      else if (sn > 0) msg = `学科「${s.name}」下仅有 ${sn} 个阶段、暂无题目，删除后其阶段将一并移除。`;
+      else msg = `学科「${s.name}」下没有阶段与题目，删除后不可恢复。`;
+      const ok = await UI.confirm({ title, message: msg, confirmText: '确认删除', danger: true, icon: '🗑' });
+      if (!ok) return;
+      subjects = subjects.filter(x => x.id !== sid);
+      Admin.log('删除', '学科「' + s.name + '」', qn > 0 ? `级联删除 ${sn} 个阶段、${qn} 道题目` : sn > 0 ? `级联删除 ${sn} 个阶段` : '删除空学科');
+      save(true);
+      UI.toast('学科已删除', 'success');
+      return;
+    }
+
+    if (act === 'stage-add') { openStageModal(sid); return; }
+
+    const stId = btn.dataset.stage;
+    const si = s.stages.findIndex(x => x.id === stId);
+    const st = s.stages[si];
+    if (!st) return;
+
+    if (act === 'stage-up' || act === 'stage-down') {
+      const ti = si + (act === 'stage-up' ? -1 : 1);
+      if (ti < 0 || ti >= s.stages.length) return;
+      const tmp = s.stages[si]; s.stages[si] = s.stages[ti]; s.stages[ti] = tmp;
+      s.stages.forEach((x, i) => x.order = i + 1);
+      save(true);
+      return;
+    }
+
+    if (act === 'stage-toggle') {
+      st.enabled = st.enabled === false;
+      Admin.log(st.enabled ? '启用' : '禁用', '阶段「' + st.name + '」', '所属学科：' + s.name);
+      save(true);
+      UI.toast(st.enabled ? '阶段已启用' : '阶段已禁用，前台将不再展示该阶段', st.enabled ? 'success' : 'info');
+      return;
+    }
+
+    if (act === 'stage-edit') { openStageModal(sid, stId); return; }
+
+    if (act === 'stage-del') {
+      const n = st.questions.length;
+      const ok = await UI.confirm({
+        title: '删除阶段',
+        message: n > 0
+          ? `阶段「${st.name}」下关联 ${n} 道题目，删除阶段将同时移除这些题目，且不可恢复。`
+          : `阶段「${st.name}」下暂无题目，删除后不可恢复。`,
+        confirmText: '确认删除', danger: true, icon: '🗑'
+      });
+      if (!ok) return;
+      s.stages.splice(si, 1);
+      s.stages.forEach((x, i) => x.order = i + 1);
+      Admin.log('删除', '阶段「' + st.name + '」', n > 0 ? `级联删除 ${n} 道题目` : '删除空阶段');
+      save(true);
+      UI.toast('阶段已删除', 'success');
+    }
+  });
+
+  render();
+})();
+</script>
+<style>
+  .sc2-actions .btn:disabled, .sl-actions .btn:disabled { opacity: .3; cursor: not-allowed; }
+  .color-palette { display: flex; gap: 9px; flex-wrap: wrap; padding-top: 4px; }
+  .color-palette button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line-2); transition: .15s; }
+  .color-palette button.active { box-shadow: 0 0 0 2px var(--text-2); transform: scale(1.08); }
+  .stage-line.is-off { opacity: .62; }
+  .stage-line .sl-actions { flex-wrap: wrap; }
+  .stage-empty { padding: 12px; text-align: center; font-size: 12px; color: var(--muted-2); background: #fbfbfd; border-radius: 8px; }
+  .danger-text { color: var(--danger) !important; }
+</style>
+</body>
+</html>

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>用户管理 · 云枢智学管理端</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+  <div id="adminAsideMount"></div>
+  <div class="admin-main">
+    <div id="adminTopbarMount"></div>
+    <main class="admin-content">
+
+      <div class="page-head">
+        <div>
+          <h1>用户管理</h1>
+          <div class="desc">管理后台内部账号，超级管理员为系统内置唯一账号</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary btn-sm" id="addUserBtn">+ 新增用户</button>
+        </div>
+      </div>
+
+      <div class="a-card">
+        <div class="a-toolbar">
+          <div class="search"><i>🔍</i><input class="input" id="uKw" placeholder="搜索用户名 / 手机号" /></div>
+          <select class="select" id="uRole">
+            <option value="">全部角色</option>
+            <option value="super_admin">超级管理员</option>
+            <option value="content_reviewer">内容审核</option>
+            <option value="operator">运营人员</option>
+          </select>
+          <select class="select" id="uStatus">
+            <option value="">全部状态</option>
+            <option value="enabled">已启用</option>
+            <option value="disabled">已禁用</option>
+          </select>
+          <div class="spacer"></div>
+          <span class="small muted" id="uHint"></span>
+        </div>
+
+        <div class="a-batchbar" id="batchBar">
+          <span>已选择 <span class="count" id="selectedCount">0</span> 个用户</span>
+          <div class="spacer"></div>
+          <button class="btn btn-success-soft btn-xs" data-batch="enable">批量启用</button>
+          <button class="btn btn-outline btn-xs" data-batch="disable">批量禁用</button>
+          <button class="btn btn-danger-soft btn-xs" data-batch="delete">批量删除</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="check-col"><input type="checkbox" id="checkAll" /></th>
+                <th>用户</th>
+                <th style="width:155px">手机号</th>
+                <th style="width:130px">角色</th>
+                <th style="width:100px">状态</th>
+                <th style="width:155px">最后登录</th>
+                <th style="width:250px">操作</th>
+              </tr>
+            </thead>
+            <tbody id="uBody"></tbody>
+          </table>
+        </div>
+        <div id="uEmpty" style="display:none"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- 新增 / 编辑用户 -->
+<div class="modal-mask" id="userModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3 id="userModalTitle">新增用户</h3>
+        <div class="sub" id="userModalSub">创建后台账号并分配角色</div>
+      </div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-grid cols-2">
+          <div class="field" id="f-uName">
+            <label class="req">用户名</label>
+            <input class="input" id="uName" maxlength="20" placeholder="请输入用户名" />
+            <div class="err-text">请输入用户名</div>
+          </div>
+          <div class="field" id="f-uPhone">
+            <label class="req">手机号</label>
+            <input class="input" id="uPhone" maxlength="11" placeholder="请输入 11 位手机号" />
+            <div class="err-text">请输入正确的 11 位手机号</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>邮箱</label>
+          <input class="input" id="uEmail" placeholder="选填" />
+        </div>
+        <div class="form-grid cols-2">
+          <div class="field" id="f-uRole">
+            <label class="req">角色</label>
+            <select class="select" id="uRoleSelect"></select>
+            <div class="hint" id="roleHint">不可创建超级管理员</div>
+            <div class="err-text">请选择角色</div>
+          </div>
+          <div class="field">
+            <label>状态</label>
+            <div class="row gap-8" style="height:40px">
+              <button class="switch on" id="uStatusSwitch" type="button"></button>
+              <span class="small muted" id="uStatusText">已启用</span>
+            </div>
+          </div>
+        </div>
+        <div class="field" id="f-uPwd">
+          <label id="uPwdLabel" class="req">登录密码</label>
+          <input class="input" id="uPwd" type="password" placeholder="至少 6 位" autocomplete="new-password" />
+          <div class="hint" id="uPwdHint">新增用户必须设置密码</div>
+          <div class="err-text">密码至少 6 位</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="userSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 用户详情 -->
+<div class="modal-mask" id="userDetailModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div><h3>用户详情</h3><div class="sub" id="udSub"></div></div>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="modal-body" id="udBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" data-close>关闭</button>
+      <button class="btn btn-primary" id="udEdit">编辑用户</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/admin.js"></script>
+<script>
+(function () {
+  if (!Admin.renderShell('users')) return;
+  if (!Admin.isSuper()) {
+    document.querySelector('.admin-content').innerHTML = `<div class="a-card"><div class="empty" style="padding:80px 20px">
+      <div class="em-icon">🔒</div><div class="em-title">无权访问该页面</div>
+      <div class="em-sub">用户管理仅对超级管理员开放</div>
+      <a class="btn btn-outline btn-sm mt-16" href="dashboard.html">返回数据看板</a></div></div>`;
+    return;
+  }
+  UI.bindModals();
+
+  let users = Admin.copy(Admin.getUsers());
+  const EXTRA_TIME = { u1: '2026-08-01 10:00', u2: '2026-09-14 14:22', u3: '2026-09-20 09:05', u4: '2026-10-02 16:40' };
+  users.forEach(u => { if (!u.createdAt) u.createdAt = EXTRA_TIME[u.id] || '2026-10-01 09:00'; });
+  let filters = { kw: '', role: '', status: '' };
+  const selected = new Set();
+  let editingId = null;
+  let formStatus = true;
+
+  const roleName = code => Admin.ROLE_NAME[code] || code;
+  const roleBadge = code => code === 'super_admin' ? 'badge-brand' : code === 'content_reviewer' ? 'badge-info' : 'badge-success';
+  const save = () => Admin.saveUsers(users);
+
+  /* ---------- 列表 ---------- */
+  function filtered() {
+    const kw = filters.kw.trim().toLowerCase();
+    return users.filter(u => {
+      if (kw && !(u.name.toLowerCase().includes(kw) || u.phone.includes(kw))) return false;
+      if (filters.role && u.role !== filters.role) return false;
+      if (filters.status && u.status !== filters.status) return false;
+      return true;
+    });
+  }
+
+  function render() {
+    const list = filtered();
+    document.getElementById('uHint').textContent = `共 ${list.length} 个后台用户`;
+    const body = document.getElementById('uBody');
+    const empty = document.getElementById('uEmpty');
+    if (!list.length) {
+      body.innerHTML = '';
+      empty.style.display = '';
+      empty.innerHTML = `<div class="empty"><div class="em-icon">👤</div><div class="em-title">没有找到匹配的用户</div><div class="em-sub">试试调整搜索关键词或筛选条件</div></div>`;
+    } else {
+      empty.style.display = 'none';
+      body.innerHTML = list.map(u => `
+        <tr>
+          <td>${u.builtin ? '<span class="small muted" title="内置账号不可批量选择">—</span>' : `<input type="checkbox" class="row-check" data-id="${u.id}" ${selected.has(u.id) ? 'checked' : ''}>`}</td>
+          <td>
+            <div class="user-cell">
+              <span class="mini-avatar" style="background:${u.role === 'super_admin' ? 'linear-gradient(135deg,#6366f1,#a855f7)' : u.role === 'content_reviewer' ? 'linear-gradient(135deg,#0ea5e9,#6366f1)' : 'linear-gradient(135deg,#10b981,#0ea5e9)'}">${UI.esc(UI.initial(u.name))}</span>
+              <div><div class="uc-n">${UI.esc(u.name)} ${u.builtin ? '<span class="badge badge-outline" style="height:19px;font-size:10.5px">内置</span>' : ''}</div><div class="uc-s">${UI.esc(u.email || '—')}</div></div>
+            </div>
+          </td>
+          <td class="small">${UI.esc(u.phone)}</td>
+          <td><span class="badge ${roleBadge(u.role)}">${roleName(u.role)}</span></td>
+          <td>${u.status === 'enabled' ? '<span class="badge badge-success">已启用</span>' : '<span class="badge badge-danger">已禁用</span>'}</td>
+          <td class="small muted">${UI.esc(u.lastLogin || '—')}</td>
+          <td><div class="inline-actions">
+            <button data-act="detail" data-id="${u.id}">详情</button>
+            <button data-act="edit" data-id="${u.id}">编辑</button>
+            <button data-act="reset" data-id="${u.id}">重置密码</button>
+            ${u.builtin ? '' : `<button data-act="toggle" data-id="${u.id}">${u.status === 'enabled' ? '禁用' : '启用'}</button>
+            <button class="danger" data-act="delete" data-id="${u.id}">删除</button>`}
+          </div></td>
+        </tr>`).join('');
+    }
+    updateBatchBar();
+    const all = document.getElementById('checkAll');
+    if (all) all.checked = false;
+  }
+
+  function updateBatchBar() {
+    document.getElementById('batchBar').classList.toggle('show', selected.size > 0);
+    document.getElementById('selectedCount').textContent = selected.size;
+  }
+  function clearSelection() {
+    selected.clear();
+    document.querySelectorAll('.row-check').forEach(c => c.checked = false);
+    const a = document.getElementById('checkAll'); if (a) a.checked = false;
+    updateBatchBar();
+  }
+
+  /* ---------- 行操作 ---------- */
+  document.getElementById('uBody').addEventListener('click', async e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const u = users.find(x => x.id === b.dataset.id); if (!u) return;
+    const act = b.dataset.act;
+    if (act === 'detail') return openDetail(u.id);
+    if (act === 'edit') return openForm(u.id);
+    if (act === 'reset') {
+      const ok = await UI.confirm({
+        title: '重置密码',
+        message: `确定将用户「${u.name}」的登录密码重置为默认密码 <b>123456</b> 吗？重置后请及时通知本人修改。`,
+        confirmText: '确认重置', icon: '🔑'
+      });
+      if (!ok) return;
+      Admin.log('编辑', '后台用户「' + u.name + '」', '重置登录密码为默认密码');
+      UI.toast('密码已重置为 123456', 'success');
+      return;
+    }
+    if (act === 'toggle') {
+      u.status = u.status === 'enabled' ? 'disabled' : 'enabled';
+      save();
+      Admin.log(u.status === 'enabled' ? '启用' : '禁用', '后台用户「' + u.name + '」', '账号状态变更');
+      render();
+      UI.toast(u.status === 'enabled' ? '用户已启用' : '用户已禁用', 'success');
+      return;
+    }
+    if (act === 'delete') {
+      const ok = await UI.confirm({
+        title: '删除用户', message: `确定删除后台用户「${u.name}」吗？删除后该账号将无法登录管理后台。`,
+        confirmText: '确认删除', danger: true, icon: '🗑'
+      });
+      if (!ok) return;
+      users = users.filter(x => x.id !== u.id);
+      selected.delete(u.id);
+      save();
+      Admin.log('删除', '后台用户「' + u.name + '」', '删除后台账号');
+      clearSelection(); render();
+      UI.toast('用户已删除', 'success');
+    }
+  });
+
+  document.getElementById('uBody').addEventListener('change', e => {
+    const c = e.target.closest('.row-check'); if (!c) return;
+    if (c.checked) selected.add(c.dataset.id); else selected.delete(c.dataset.id);
+    updateBatchBar();
+  });
+  document.getElementById('checkAll').addEventListener('change', e => {
+    document.querySelectorAll('.row-check').forEach(c => {
+      c.checked = e.target.checked;
+      if (e.target.checked) selected.add(c.dataset.id); else selected.delete(c.dataset.id);
+    });
+    updateBatchBar();
+  });
+
+  document.getElementById('batchBar').addEventListener('click', async e => {
+    const b = e.target.closest('[data-batch]'); if (!b) return;
+    const ids = [...selected]; if (!ids.length) return;
+    const act = b.dataset.batch;
+    if (act === 'delete') {
+      const names = users.filter(u => ids.includes(u.id)).map(u => u.name).join('、');
+      const ok = await UI.confirm({ title: '批量删除用户', message: `确定删除选中的 ${ids.length} 个后台用户吗？<br>${UI.esc(names)}`, confirmText: '确认删除', danger: true, icon: '🗑' });
+      if (!ok) return;
+      users = users.filter(u => !ids.includes(u.id));
+      save();
+      Admin.log('删除', '用户管理', `批量删除 ${ids.length} 个后台用户`);
+      clearSelection(); render();
+      UI.toast(`已删除 ${ids.length} 个用户`, 'success');
+      return;
+    }
+    const status = act === 'enable' ? 'enabled' : 'disabled';
+    const label = act === 'enable' ? '启用' : '禁用';
+    const ok = await UI.confirm({ title: `批量${label}用户`, message: `确定${label}选中的 ${ids.length} 个后台用户吗？`, confirmText: `确认${label}`, danger: act === 'disable', icon: act === 'disable' ? '⛔' : '✓' });
+    if (!ok) return;
+    users.forEach(u => { if (ids.includes(u.id)) u.status = status; });
+    save();
+    Admin.log(label, '用户管理', `批量${label} ${ids.length} 个后台用户`);
+    clearSelection(); render();
+    UI.toast(`已${label} ${ids.length} 个用户`, 'success');
+  });
+
+  /* ---------- 新增 / 编辑 ---------- */
+  function openForm(id) {
+    editingId = id || null;
+    const u = id ? users.find(x => x.id === id) : null;
+    const builtinSuper = u && u.builtin && u.role === 'super_admin';
+    document.getElementById('userModalTitle').textContent = u ? '编辑用户' : '新增用户';
+    document.getElementById('userModalSub').textContent = builtinSuper ? '内置超级管理员账号，角色不可修改' : u ? '修改用户信息与账号状态' : '创建后台账号并分配角色';
+    document.getElementById('uName').value = u ? u.name : '';
+    document.getElementById('uPhone').value = u ? u.phone : '';
+    document.getElementById('uEmail').value = u ? (u.email || '') : '';
+    document.getElementById('uPwd').value = '';
+    document.getElementById('uPwdLabel').textContent = u ? '新密码（选填）' : '登录密码';
+    document.getElementById('uPwdLabel').classList.toggle('req', !u);
+    document.getElementById('uPwdHint').textContent = u ? '留空则不修改密码；如需重置可填写至少 6 位新密码' : '新增用户必须设置密码，至少 6 位';
+    const sel = document.getElementById('uRoleSelect');
+    if (builtinSuper) {
+      sel.innerHTML = '<option value="super_admin">超级管理员</option>';
+      sel.value = 'super_admin';
+      sel.disabled = true;
+      document.getElementById('roleHint').textContent = '内置超级管理员角色不可修改';
+    } else {
+      sel.disabled = false;
+      sel.innerHTML = '<option value="">请选择角色</option><option value="content_reviewer">内容审核</option><option value="operator">运营人员</option>';
+      sel.value = u ? u.role : '';
+      document.getElementById('roleHint').textContent = '角色不可选择超级管理员';
+    }
+    formStatus = u ? u.status === 'enabled' : true;
+    const sw = document.getElementById('uStatusSwitch');
+    sw.classList.toggle('on', formStatus);
+    document.getElementById('uStatusText').textContent = formStatus ? '已启用' : '已禁用';
+    ['f-uName', 'f-uPhone', 'f-uRole', 'f-uPwd'].forEach(f => document.getElementById(f).classList.remove('invalid'));
+    UI.open('userModal');
+    setTimeout(() => document.getElementById('uName').focus(), 100);
+  }
+
+  document.getElementById('addUserBtn').onclick = () => openForm();
+  document.getElementById('uName').addEventListener('input', () => document.getElementById('f-uName').classList.remove('invalid'));
+  document.getElementById('uPhone').addEventListener('input', () => document.getElementById('f-uPhone').classList.remove('invalid'));
+  document.getElementById('uRoleSelect').addEventListener('change', () => document.getElementById('f-uRole').classList.remove('invalid'));
+  document.getElementById('uPwd').addEventListener('input', () => document.getElementById('f-uPwd').classList.remove('invalid'));
+  document.getElementById('uStatusSwitch').onclick = function () {
+    formStatus = !formStatus;
+    this.classList.toggle('on', formStatus);
+    document.getElementById('uStatusText').textContent = formStatus ? '已启用' : '已禁用';
+  };
+
+  document.getElementById('userSave').onclick = () => {
+    const name = document.getElementById('uName').value.trim();
+    const phone = document.getElementById('uPhone').value.trim();
+    const email = document.getElementById('uEmail').value.trim();
+    const role = document.getElementById('uRoleSelect').value;
+    const pwd = document.getElementById('uPwd').value;
+    const builtinSuper = editingId && (users.find(x => x.id === editingId) || {}).builtin;
+    const okN = !!name, okP = /^1\d{10}$/.test(phone);
+    const okR = !!role;
+    const okPwd = editingId ? (!pwd || pwd.length >= 6) : pwd.length >= 6;
+    document.getElementById('f-uName').classList.toggle('invalid', !okN);
+    document.getElementById('f-uPhone').classList.toggle('invalid', !okP);
+    document.getElementById('f-uRole').classList.toggle('invalid', !okR);
+    document.getElementById('f-uPwd').classList.toggle('invalid', !okPwd);
+    if (!okN) { UI.toast('请输入用户名', 'error'); return; }
+    if (!okP) { UI.toast('请输入正确的 11 位手机号', 'error'); return; }
+    if (!okR) { UI.toast('请选择角色', 'error'); return; }
+    if (!okPwd) { UI.toast('密码至少 6 位', 'error'); return; }
+
+    if (editingId) {
+      const u = users.find(x => x.id === editingId);
+      Object.assign(u, { name, phone, email, role, roleName: roleName(role), status: formStatus ? 'enabled' : 'disabled' });
+      Admin.log('编辑', '后台用户「' + name + '」', pwd ? '更新资料并重置密码' : '更新用户资料');
+      UI.toast(pwd ? '用户已更新，密码已重置' : '用户已更新', 'success');
+    } else {
+      users.unshift({
+        id: Admin.nextId('u'), name, phone, email, role, roleName: roleName(role),
+        status: formStatus ? 'enabled' : 'disabled', builtin: false,
+        lastLogin: '—', createdAt: new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
+      });
+      Admin.log('新增', '后台用户「' + name + '」', '角色：' + roleName(role));
+      UI.toast('用户已创建', 'success');
+    }
+    save();
+    UI.close('userModal');
+    render();
+  };
+
+  /* ---------- 详情 ---------- */
+  function openDetail(id) {
+    const u = users.find(x => x.id === id); if (!u) return;
+    document.getElementById('udSub').textContent = `用户 ID：${u.id}`;
+    const logs = Admin.getLogs().filter(l => l.user === u.name).slice(0, 5);
+    document.getElementById('udBody').innerHTML = `
+      <div class="ud-profile">
+        <span class="mini-avatar" style="width:58px;height:58px;font-size:18px;background:linear-gradient(135deg,#818cf8,#c084fc)">${UI.esc(UI.initial(u.name))}</span>
+        <div style="flex:1;min-width:0">
+          <div class="row gap-8 wrap"><span style="font-size:17px;font-weight:800">${UI.esc(u.name)}</span>
+            <span class="badge ${roleBadge(u.role)}">${roleName(u.role)}</span>
+            ${u.status === 'enabled' ? '<span class="badge badge-success">已启用</span>' : '<span class="badge badge-danger">已禁用</span>'}
+            ${u.builtin ? '<span class="badge badge-outline">系统内置</span>' : ''}
+          </div>
+          <div class="small muted mt-8">${UI.esc(u.email || '未填写邮箱')} · 最后登录 ${UI.esc(u.lastLogin || '—')}</div>
+        </div>
+      </div>
+      <div class="detail-section">
+        <div class="ds-label">资料信息</div>
+        <div class="detail-grid">
+          <div class="dg-i"><span class="k">用户名</span><span class="v">${UI.esc(u.name)}</span></div>
+          <div class="dg-i"><span class="k">手机号</span><span class="v">${UI.esc(u.phone)}</span></div>
+          <div class="dg-i"><span class="k">邮箱</span><span class="v">${UI.esc(u.email || '—')}</span></div>
+          <div class="dg-i"><span class="k">角色</span><span class="v">${roleName(u.role)}</span></div>
+          <div class="dg-i"><span class="k">创建时间</span><span class="v">${UI.esc(u.createdAt || '—')}</span></div>
+          <div class="dg-i"><span class="k">最后登录</span><span class="v">${UI.esc(u.lastLogin || '—')}</span></div>
+        </div>
+      </div>
+      <div class="detail-section" style="border-bottom:0;margin-bottom:0;padding-bottom:0">
+        <div class="ds-label">最近操作</div>
+        ${logs.length ? `<div class="ud-logs">${logs.map(l => `
+          <div class="ud-log">
+            <span class="ul-dot"></span>
+            <div style="flex:1;min-width:0">
+              <div><b>${UI.esc(l.action)}</b> · ${UI.esc(l.target)}</div>
+              <div class="small muted mt-8">${UI.esc(l.detail)}</div>
+            </div>
+            <span class="small muted nowrap">${UI.esc(l.time.slice(5, 16))}</span>
+          </div>`).join('')}</div>`
+        : '<div class="small muted" style="padding:18px;background:#fafbfc;border-radius:9px;text-align:center">该用户暂无操作记录</div>'}
+      </div>`;
+    document.getElementById('udEdit').onclick = () => { UI.close('userDetailModal'); openForm(u.id); };
+    UI.open('userDetailModal');
+  }
+
+  /* ---------- 筛选 ---------- */
+  document.getElementById('uKw').addEventListener('input', UI.debounce(e => { filters.kw = e.target.value; clearSelection(); render(); }, 300));
+  document.getElementById('uRole').addEventListener('change', e => { filters.role = e.target.value; clearSelection(); render(); });
+  document.getElementById('uStatus').addEventListener('change', e => { filters.status = e.target.value; clearSelection(); render(); });
+
+  render();
+})();
+</script>
+<style>
+  .row-check, #checkAll { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; }
+  .ud-profile { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+  .detail-section { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .ds-label { font-size: 12px; color: var(--muted); font-weight: 650; margin-bottom: 10px; letter-spacing: .03em; }
+  .ud-logs { display: flex; flex-direction: column; }
+  .ud-log { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 12.5px; }
+  .ud-log:last-child { border-bottom: 0; }
+  .ul-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); margin-top: 7px; flex: none; }
+  .ud-log b { font-weight: 650; }
+  .inline-actions { row-gap: 3px; }
+</style>
+</body>
+</html>

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 · 云枢智学</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/portal.css">
+</head>
+<body>
+
+<div class="auth-wrap">
+  <!-- 左侧品牌 -->
+  <aside class="auth-side">
+    <div class="inner">
+      <a class="logo" href="index.html"><span class="logo-mark">云</span><span>云枢智学</span></a>
+      <h2>把每一次练习<br>变成面试时的底气</h2>
+      <p class="sub">登录后继续你的学习进度：刷题记录、错题本、学习路线与 AI 面试报告都会为你保留。</p>
+      <div class="points">
+        <div><span class="pi">🎯</span><span>按阶段刷题，错题自动归档并按错误频次分级</span></div>
+        <div><span class="pi">📊</span><span>AI 面试逐题评分，生成 6 维能力分析报告</span></div>
+        <div><span class="pi">🧭</span><span>8 大 AI 技术方向，路线与课程一站式配齐</span></div>
+      </div>
+      <div class="auth-foot">© 2026 云枢智学 · 原型演示环境，数据均为模拟数据</div>
+    </div>
+  </aside>
+
+  <!-- 右侧表单 -->
+  <main class="auth-main">
+    <div class="auth-topbar">还没有账号？<a href="register.html">立即注册</a></div>
+    <div class="auth-box">
+      <h1 class="auth-title">欢迎回来 👋</h1>
+      <p class="auth-sub">登录云枢智学，继续你的 AI 学习之旅</p>
+
+      <div class="tabs" style="width:100%;margin-bottom:22px" id="loginTabs">
+        <button class="active" data-tab="pwd" style="flex:1">账号密码登录</button>
+        <button data-tab="otp" style="flex:1">手机验证码登录</button>
+      </div>
+
+      <div id="errBar" class="error-bar" style="display:none">
+        <span>⚠</span><span id="errMsg"></span>
+      </div>
+
+      <!-- 账号密码 -->
+      <form class="form-stack" id="pwdForm" novalidate>
+        <div class="field" id="f-account">
+          <label>手机号 / 邮箱</label>
+          <div class="input-icon">
+            <span class="i">👤</span>
+            <input class="input" id="account" placeholder="请输入手机号或邮箱" autocomplete="username" />
+          </div>
+          <div class="err-text">请输入手机号或邮箱</div>
+        </div>
+        <div class="field" id="f-password">
+          <label>密码</label>
+          <div class="input-icon">
+            <span class="i">🔒</span>
+            <input class="input" id="password" type="password" placeholder="请输入密码" autocomplete="current-password" style="padding-right:44px" />
+            <button type="button" id="togglePwd" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted-2);font-size:14px" title="显示密码">👁</button>
+          </div>
+          <div class="err-text">请输入密码</div>
+        </div>
+        <div class="row-between">
+          <label class="checkbox"><input type="checkbox" id="remember" checked> 记住我</label>
+          <a class="link small" href="forgot-password.html">忘记密码？</a>
+        </div>
+        <button class="btn btn-primary btn-block" style="height:44px" type="submit" id="loginBtn">登 录</button>
+      </form>
+
+      <!-- 验证码 -->
+      <form class="form-stack" id="otpForm" novalidate style="display:none">
+        <div class="field" id="f-phone2">
+          <label>手机号</label>
+          <div class="input-icon">
+            <span class="i">📱</span>
+            <input class="input" id="phone2" placeholder="请输入 11 位手机号" maxlength="11" />
+          </div>
+          <div class="err-text">请输入正确的 11 位手机号</div>
+        </div>
+        <div class="field" id="f-code">
+          <label>验证码</label>
+          <div class="otp-row">
+            <input class="input" id="code" placeholder="请输入 6 位验证码" maxlength="6" />
+            <button class="btn btn-outline" type="button" id="sendCode">获取验证码</button>
+          </div>
+          <div class="err-text">请输入 6 位验证码</div>
+        </div>
+        <div class="hint">未注册的手机号验证后将自动创建账号</div>
+        <button class="btn btn-primary btn-block" style="height:44px" type="submit">登 录</button>
+      </form>
+
+      <div class="auth-alt">
+        <div class="rule">其他登录方式</div>
+        <div class="socials">
+          <button type="button" title="微信登录" data-social="微信">💬</button>
+          <button type="button" title="QQ 登录" data-social="QQ">🐧</button>
+          <button type="button" title="GitHub 登录" data-social="GitHub">🐙</button>
+        </div>
+      </div>
+
+      <div class="demo-hint">
+        <b>演示提示：</b>账号 <b>13912345678</b>，密码 <b>123456</b>。也可使用后台账号 <b>13800000000</b> 登录，登录后导航栏会出现「管理后台」入口。
+      </div>
+
+      <div class="foot-note">登录即代表同意《用户协议》和《隐私政策》</div>
+    </div>
+  </main>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script>
+(function () {
+  const redirect = new URLSearchParams(location.search).get('redirect') || 'index.html';
+  const errBar = document.getElementById('errBar');
+  const errMsg = document.getElementById('errMsg');
+  function showErr(msg) { errMsg.textContent = msg; errBar.style.display = 'flex'; }
+  function hideErr() { errBar.style.display = 'none'; }
+  function setField(id, ok) { document.getElementById(id).classList.toggle('invalid', !ok); }
+
+  /* Tab 切换 */
+  document.getElementById('loginTabs').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-tab]');
+    if (!btn) return;
+    document.querySelectorAll('#loginTabs button').forEach(b => b.classList.toggle('active', b === btn));
+    const isPwd = btn.dataset.tab === 'pwd';
+    document.getElementById('pwdForm').style.display = isPwd ? '' : 'none';
+    document.getElementById('otpForm').style.display = isPwd ? 'none' : '';
+    hideErr();
+  });
+
+  document.getElementById('togglePwd').addEventListener('click', e => {
+    const p = document.getElementById('password');
+    p.type = p.type === 'password' ? 'text' : 'password';
+    e.currentTarget.textContent = p.type === 'password' ? '👁' : '🙈';
+  });
+  document.querySelectorAll('[data-social]').forEach(b => b.addEventListener('click', () => {
+    UI.toast(`「${b.dataset.social}登录」为原型占位，暂未接入`, 'info');
+  }));
+
+  /* 登录锁定 */
+  function lockLeft() {
+    const until = UI.Store.get('login_lock_until', 0);
+    return Math.max(0, Math.ceil((until - Date.now()) / 1000));
+  }
+  let lockTimer = null;
+  function renderLock() {
+    const left = lockLeft();
+    const btn = document.getElementById('loginBtn');
+    if (left > 0) {
+      btn.disabled = true;
+      btn.textContent = `已锁定 ${Math.ceil(left / 60)} 分钟后重试`;
+      showErr(`账号已锁定，请 ${Math.ceil(left / 60)} 分钟后重试`);
+    } else if (lockTimer) {
+      clearInterval(lockTimer); lockTimer = null;
+      btn.disabled = false; btn.textContent = '登 录';
+      hideErr();
+      UI.Store.set('login_fails', 0);
+    }
+  }
+  function startLock() {
+    if (!lockTimer) lockTimer = setInterval(renderLock, 1000);
+    renderLock();
+  }
+  renderLock();
+
+  /* 账号密码登录 */
+  document.getElementById('pwdForm').addEventListener('submit', e => {
+    e.preventDefault();
+    hideErr();
+    const acc = document.getElementById('account').value.trim();
+    const pwd = document.getElementById('password').value;
+    const accOk = acc.length > 0;
+    const pwdOk = pwd.length > 0;
+    setField('f-account', accOk);
+    setField('f-password', pwdOk);
+    if (!accOk || !pwdOk) { showErr('请填写完整的账号与密码'); return; }
+    if (lockLeft() > 0) { renderLock(); return; }
+
+    const isAdminAcc = acc === '13800000000';
+    const okAcc = acc === '13912345678' || isAdminAcc || acc.indexOf('@') > -1;
+    const okPwd = pwd === '123456' || pwd.length >= 8;
+
+    if (!okAcc || !okPwd) {
+      const fails = UI.Store.get('login_fails', 0) + 1;
+      UI.Store.set('login_fails', fails);
+      if (fails >= 5) {
+        UI.Store.set('login_lock_until', Date.now() + 5 * 60 * 1000);
+        startLock();
+        return;
+      }
+      showErr(`账号或密码错误，还可尝试 ${5 - fails} 次`);
+      return;
+    }
+
+    UI.Store.set('login_fails', 0);
+    UI.Store.set('login_lock_until', 0);
+    UI.Store.set('logged_out', false);
+    UI.Store.set('user', {
+      name: isAdminAcc ? '超级管理员' : '林晓',
+      phone: isAdminAcc ? acc : '13912345678',
+      email: isAdminAcc ? 'admin@yunshu.ai' : 'linxiao@example.com',
+      gender: 'female', role: isAdminAcc ? 'admin' : 'student', isAdmin: isAdminAcc,
+      joined: '2026-09-12', days: 42, questions: 386, interviews: 12, accuracy: 86, streak: 7
+    });
+    UI.toast('登录成功，欢迎回来', 'success');
+    setTimeout(() => location.href = redirect, 450);
+  });
+
+  /* 获取验证码 */
+  let cd = 0, cdTimer = null;
+  const sendBtn = document.getElementById('sendCode');
+  function tick() {
+    if (cd <= 0) { clearInterval(cdTimer); sendBtn.disabled = false; sendBtn.textContent = '获取验证码'; return; }
+    sendBtn.textContent = `${cd}s 后重发`;
+    cd--;
+  }
+  sendBtn.addEventListener('click', () => {
+    const phone = document.getElementById('phone2').value.trim();
+    if (!/^1\d{10}$/.test(phone)) { setField('f-phone2', false); return; }
+    setField('f-phone2', true);
+    const daily = UI.Store.get('code_daily_' + phone, 0);
+    if (daily >= 10) { UI.toast('今日获取次数已达上限', 'warn'); return; }
+    UI.Store.set('code_daily_' + phone, daily + 1);
+    cd = 60; sendBtn.disabled = true;
+    clearInterval(cdTimer); cdTimer = setInterval(tick, 1000); tick();
+    UI.toast('验证码已发送（演示环境：任意 6 位数字均可）', 'success');
+  });
+
+  document.getElementById('otpForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const phone = document.getElementById('phone2').value.trim();
+    const code = document.getElementById('code').value.trim();
+    const pOk = /^1\d{10}$/.test(phone), cOk = /^\d{6}$/.test(code);
+    setField('f-phone2', pOk); setField('f-code', cOk);
+    if (!pOk || !cOk) return;
+    UI.Store.set('logged_out', false);
+    UI.Store.set('user', {
+      name: '林晓', phone: phone, email: 'linxiao@example.com', gender: 'female',
+      role: 'student', isAdmin: false, joined: '2026-09-12', days: 42,
+      questions: 386, interviews: 12, accuracy: 86, streak: 7
+    });
+    UI.toast('登录成功', 'success');
+    setTimeout(() => location.href = redirect, 450);
+  });
+})();
+</script>
+</body>
+</html>

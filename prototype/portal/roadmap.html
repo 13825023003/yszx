@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>学习路线 · 云枢智学</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/portal.css">
+</head>
+<body>
+
+<div id="siteHeader"></div>
+
+<section class="page-hero">
+  <div class="container-wide">
+    <h1>学习路线</h1>
+    <p class="desc">由一线工程师编排的成体系路线，直接看 B 站课程，按列表顺序学习即可</p>
+  </div>
+</section>
+
+<div class="page-body">
+  <div class="container-wide">
+    <div class="row-between mb-12">
+      <span class="title-sm">选择学科方向</span>
+      <span class="small muted" id="subjHint"></span>
+    </div>
+    <div class="r-subjects" id="subjectCards"></div>
+
+    <div id="routeArea"></div>
+  </div>
+</div>
+
+<div id="siteFooter"></div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script>
+(function () {
+  UI.renderHeader('roadmap');
+  UI.renderFooter();
+
+  const params = new URLSearchParams(location.search);
+  let subjectId = params.get('subject');
+  if (!DB.SUBJECT_MAP[subjectId]) subjectId = DB.SUBJECTS[0].id;
+
+  function courseCount(sid) { return DB.COURSES.filter(c => c.subjectId === sid).length; }
+
+  function renderSubjects() {
+    document.getElementById('subjHint').textContent = '8 个方向，随时切换';
+    document.getElementById('subjectCards').innerHTML = DB.SUBJECTS.map(s => `
+      <div class="r-subject ${s.id === subjectId ? 'active' : ''}" data-sid="${s.id}">
+        <span class="rs-icon" style="background:${s.soft};color:${s.color}">${s.icon}</span>
+        <div style="min-width:0"><b>${UI.esc(s.name)}</b><span>${courseCount(s.id)} 门课程</span></div>
+      </div>`).join('');
+    document.querySelectorAll('.r-subject').forEach(el => el.addEventListener('click', () => {
+      subjectId = el.dataset.sid;
+      const p = new URLSearchParams(); p.set('subject', subjectId);
+      history.replaceState(null, '', 'roadmap.html?' + p);
+      renderSubjects(); renderRoute();
+    }));
+  }
+
+  function renderRoute() {
+    const area = document.getElementById('routeArea');
+    const subject = DB.SUBJECT_MAP[subjectId];
+    const route = DB.ROUTES.find(r => r.subjectId === subjectId && r.enabled);
+
+    if (!route) {
+      area.innerHTML = `<div class="empty" style="background:#fff;border:1px solid var(--line);border-radius:16px;margin-top:18px">
+        <div class="em-icon">🧭</div>
+        <div class="em-title">该学科暂无学习路线</div>
+        <div class="em-sub">路线正在编排中，可以先到题库练习该学科题目</div>
+        <a class="btn btn-soft btn-sm mt-16" href="questions.html?subject=${subjectId}">去题库看看</a>
+      </div>`;
+      return;
+    }
+
+    const courses = route.courseIds.map(id => DB.COURSE_MAP[id]).filter(Boolean);
+    const totalMin = courses.reduce((n, c) => n + c.minutes, 0);
+
+    area.innerHTML = `
+      <div class="roadmap-head reveal">
+        <div class="rh-main">
+          <div class="row gap-8 mb-8">
+            <span class="badge badge-brand">${subject.icon} ${UI.esc(subject.name)}</span>
+            <span class="badge badge-success">路线已上线</span>
+          </div>
+          <h2>${UI.esc(route.name)}</h2>
+          <div class="rh-desc">${UI.esc(route.desc)}</div>
+          <div class="rh-stats">
+            <div><b>${courses.length}</b><span>门课程</span></div>
+            <div><b>${UI.fmtDuration(totalMin)}</b><span>总计时长</span></div>
+            <div><b>1 → ${courses.length}</b><span>按列表顺序学习</span></div>
+          </div>
+        </div>
+        <div class="rh-side">
+          <div class="small muted">适合人群</div>
+          <div style="font-weight:700;font-size:13.5px;margin-top:4px;line-height:1.6">${UI.esc(route.audience)}</div>
+          <div class="divider" style="margin:12px 0"></div>
+          <div class="small muted" style="line-height:1.7">学完可到「题库中心」练习对应阶段，再用 AI 面试检验掌握程度。</div>
+          <a class="btn btn-primary btn-sm btn-block mt-12" href="interview-config.html">去 AI 面试</a>
+        </div>
+      </div>
+
+      <div class="row-between mt-24 mb-12">
+        <span class="title-sm">路线课程（共 ${courses.length} 门）</span>
+        <span class="small muted">课程顺序即为推荐学习顺序</span>
+      </div>
+
+      <div id="courseList">
+        ${courses.length ? courses.map((c, i) => `
+          <div class="course-item reveal" style="transition-delay:${i * .04}s">
+            <span class="ci-no">${String(i + 1).padStart(2, '0')}</span>
+            <div class="ci-cover" style="background:${c.cover}">
+              ${c.coverUrl ? `<img src="${UI.esc(c.coverUrl)}" alt="${UI.esc(c.title)}" loading="lazy" onerror="this.style.display='none'" />` : ''}
+              <span class="ci-play">▶</span>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="ci-title">${UI.esc(c.title)}</div>
+              <div class="ci-meta">
+                <span>⏱ ${UI.fmtDuration(c.minutes)}</span>
+              </div>
+            </div>
+            <a class="btn btn-outline btn-sm nowrap" href="https://www.bilibili.com/video/${c.bv}" target="_blank" rel="noopener">去 B 站学习 ↗</a>
+          </div>`).join('') : `
+          <div class="empty" style="background:#fff;border:1px solid var(--line);border-radius:16px">
+            <div class="em-icon">🎬</div>
+            <div class="em-title">课程筹备中，敬请期待</div>
+            <div class="em-sub">路线已发布，课程正在陆续上架</div>
+          </div>`}
+      </div>`;
+    UI.initReveal();
+  }
+
+  renderSubjects();
+  renderRoute();
+})();
+</script>
+</body>
+</html>

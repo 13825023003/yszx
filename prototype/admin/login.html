@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管理后台登录 · 云枢智学</title>
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body>
+
+<div class="admin-login" style="min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:radial-gradient(circle at 15% 10%, #2a2560 0%, #131629 42%, #0b0e19 100%)">
+  <a class="back-home" href="../portal/index.html">‹ 返回学员前台</a>
+  <div class="login-card">
+    <div class="lg-logo">☁</div>
+    <h1>云枢智学 · 管理后台</h1>
+    <div class="lg-sub">内容、题库、学员与系统配置统一管理</div>
+
+    <div class="error-bar" id="errBar" style="display:none;margin-top:20px;margin-bottom:0">
+      <span>⚠</span><span id="errMsg"></span>
+    </div>
+
+    <form class="lg-form" id="loginForm" novalidate>
+      <div class="field" id="f-account">
+        <label class="req">管理员账号</label>
+        <div class="input-icon">
+          <span class="i">👤</span>
+          <input class="input" id="account" placeholder="请输入管理员账号" autocomplete="username" value="admin" />
+        </div>
+        <div class="err-text">请输入管理员账号</div>
+      </div>
+      <div class="field" id="f-pwd">
+        <label class="req">登录密码</label>
+        <div class="input-icon">
+          <span class="i">🔒</span>
+          <input class="input" id="password" type="password" placeholder="请输入登录密码" autocomplete="current-password" value="123456" style="padding-right:44px" />
+          <button type="button" id="togglePwd" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted-2)">👁</button>
+        </div>
+        <div class="err-text">请输入登录密码</div>
+      </div>
+
+      <div class="lg-foot">
+        <label class="checkbox"><input type="checkbox" id="remember" checked> 记住登录状态</label>
+        <a href="javascript:void(0)" id="forgot">忘记密码？</a>
+      </div>
+
+      <button class="btn btn-primary btn-block" style="height:44px" type="submit" id="loginBtn">登 录</button>
+    </form>
+
+    <div style="margin-top:16px;text-align:center">
+      <a href="../portal/index.html" class="small" style="color:var(--muted)">‹ 返回学员前台</a>
+    </div>
+
+    <div class="role-demo">
+      <div class="rd-label">演示：一键以不同角色登录，体验菜单与按钮权限差异</div>
+      <div class="rd-btns">
+        <button type="button" data-role="super_admin">超级管理员</button>
+        <button type="button" data-role="content_reviewer">内容审核</button>
+        <button type="button" data-role="operator">运营人员</button>
+      </div>
+      <div class="hint" style="text-align:center;margin-top:10px">演示账号 admin / 123456</div>
+    </div>
+  </div>
+  <div class="copyright">© 2026 云枢智学 · 原型演示环境，数据均为模拟数据</div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script>
+(function () {
+  UI.bindModals();
+  const redirect = new URLSearchParams(location.search).get('redirect') || 'dashboard.html';
+  const errBar = document.getElementById('errBar');
+  const errMsg = document.getElementById('errMsg');
+  function showErr(m) { errMsg.textContent = m; errBar.style.display = 'flex'; }
+  function hideErr() { errBar.style.display = 'none'; }
+  function setField(id, ok) { document.getElementById(id).classList.toggle('invalid', !ok); }
+
+  document.getElementById('togglePwd').addEventListener('click', e => {
+    const p = document.getElementById('password');
+    p.type = p.type === 'password' ? 'text' : 'password';
+    e.currentTarget.textContent = p.type === 'password' ? '👁' : '🙈';
+  });
+
+  document.getElementById('forgot').addEventListener('click', () => {
+    UI.confirm({ title: '忘记密码', message: '管理后台账号不支持自助找回密码，请联系系统超级管理员为你重置密码。', confirmText: '知道了', cancelText: '关闭', icon: '🔐' });
+  });
+
+  function lockLeft() {
+    return Math.max(0, Math.ceil((UI.Store.get('admin_lock_until', 0) - Date.now()) / 1000));
+  }
+  let lockTimer = null;
+  function renderLock() {
+    const left = lockLeft();
+    const btn = document.getElementById('loginBtn');
+    if (left > 0) {
+      btn.disabled = true;
+      btn.textContent = `已锁定 ${Math.ceil(left / 60)} 分钟后重试`;
+      showErr(`账号已锁定，请 ${Math.ceil(left / 60)} 分钟后重试`);
+    } else if (lockTimer) {
+      clearInterval(lockTimer); lockTimer = null;
+      btn.disabled = false; btn.textContent = '登 录';
+      UI.Store.set('admin_login_fails', 0);
+      hideErr();
+    }
+  }
+  function startLock() { if (!lockTimer) lockTimer = setInterval(renderLock, 1000); renderLock(); }
+  renderLock();
+
+  const ROLE_NAME = { super_admin: '超级管理员', content_reviewer: '内容审核', operator: '运营人员' };
+  const ROLE_PHONE = { super_admin: '13800000000', content_reviewer: '13800138001', operator: '13800138002' };
+
+  function doLogin(role, name) {
+    UI.Store.set('admin_login_fails', 0);
+    UI.Store.set('admin_lock_until', 0);
+    UI.Store.set('admin_logged_out', false);
+    UI.Store.set('admin', {
+      name: name || ROLE_NAME[role], role: role, roleName: ROLE_NAME[role], phone: ROLE_PHONE[role]
+    });
+    UI.toast(`登录成功 · ${ROLE_NAME[role]}`, 'success');
+    setTimeout(() => location.href = redirect, 450);
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', e => {
+    e.preventDefault();
+    hideErr();
+    const account = document.getElementById('account').value.trim();
+    const pwd = document.getElementById('password').value;
+    const okA = !!account, okP = !!pwd;
+    setField('f-account', okA); setField('f-pwd', okP);
+    if (!okA) { showErr('请输入管理员账号'); document.getElementById('account').focus(); return; }
+    if (!okP) { showErr('请输入登录密码'); document.getElementById('password').focus(); return; }
+    if (lockLeft() > 0) { renderLock(); return; }
+
+    if (account !== 'admin' && account !== '13800000000') {
+      registerFail('账号不存在或密码错误');
+      return;
+    }
+    if (pwd !== '123456') {
+      registerFail('账号不存在或密码错误');
+      return;
+    }
+    doLogin('super_admin', '超级管理员');
+  });
+
+  function registerFail(msg) {
+    const fails = UI.Store.get('admin_login_fails', 0) + 1;
+    UI.Store.set('admin_login_fails', fails);
+    if (fails >= 5) {
+      UI.Store.set('admin_lock_until', Date.now() + 5 * 60 * 1000);
+      startLock();
+      return;
+    }
+    showErr(`${msg}，还可尝试 ${5 - fails} 次`);
+  }
+
+  document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => {
+    doLogin(b.dataset.role);
+  }));
+})();
+</script>
+</body>
+</html>
