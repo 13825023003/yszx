@@ -6,6 +6,7 @@ import com.yunshu.zhixue.common.exception.ErrorCode;
 import com.yunshu.zhixue.common.util.LogicDeleteUtils;
 import com.yunshu.zhixue.modules.subject.dto.StageItemResponse;
 import com.yunshu.zhixue.modules.subject.dto.StageRequest;
+import com.yunshu.zhixue.modules.subject.dto.SubjectBrief;
 import com.yunshu.zhixue.modules.subject.dto.SubjectListItemResponse;
 import com.yunshu.zhixue.modules.subject.dto.SubjectRequest;
 import com.yunshu.zhixue.modules.subject.dto.SubjectStatsResponse;
@@ -62,6 +63,43 @@ public class SubjectService {
                 .sum();
         return new SubjectStatsResponse(totalSubjects, subjectsWithStages,
                 stages.size(), totalQuestions);
+    }
+
+    /** 跨模块学科选项：仅返回 id 与名称。 */
+    public List<SubjectBrief> options() {
+        return subjectMapper.selectList(Wrappers.<Subject>lambdaQuery()
+                        .orderByAsc(Subject::getSortOrder)
+                        .orderByAsc(Subject::getId))
+                .stream()
+                .map(subject -> new SubjectBrief(subject.getId(), subject.getName()))
+                .toList();
+    }
+
+    public Map<Long, SubjectBrief> briefsByIds(Collection<Long> subjectIds) {
+        if (subjectIds == null || subjectIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, SubjectBrief> result = new HashMap<>();
+        for (Subject subject : subjectMapper.selectBatchIds(subjectIds)) {
+            result.put(subject.getId(), new SubjectBrief(subject.getId(), subject.getName()));
+        }
+        return result;
+    }
+
+    public Map<String, SubjectBrief> briefsByNames(Collection<String> names) {
+        if (names == null || names.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, SubjectBrief> result = new HashMap<>();
+        subjectMapper.selectList(Wrappers.<Subject>lambdaQuery()
+                        .in(Subject::getName, names))
+                .forEach(subject -> result.put(subject.getName(),
+                        new SubjectBrief(subject.getId(), subject.getName())));
+        return result;
+    }
+
+    public boolean exists(Long subjectId) {
+        return subjectId != null && subjectMapper.selectById(subjectId) != null;
     }
 
     public List<SubjectListItemResponse> list() {

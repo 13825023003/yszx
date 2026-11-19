@@ -1,5 +1,10 @@
 /** 学科与阶段管理（A-S01 ~ A-S11）。 */
 
+export interface SubjectBrief {
+  id: number
+  name: string
+}
+
 export interface SubjectStats {
   totalSubjects: number
   subjectsWithStages: number

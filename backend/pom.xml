@@ -105,6 +105,12 @@
             <artifactId>fastexcel</artifactId>
             <version>${fastexcel.version}</version>
         </dependency>
+        <!-- POI 5.3 要求 commons-io >= 2.16.1；MinIO 传递的 2.15.1 会覆盖导致 Excel 解析失败 -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.16.1</version>
+        </dependency>
 
         <!-- Markdown 解析：面试题文档导入 -->
         <dependency>
