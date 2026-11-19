@@ -93,6 +93,38 @@ public class CourseService {
         return PageResult.of(list, result.getTotal(), current, size);
     }
 
+    /** 跨模块按 id 批量取课程信息（路线等模块使用）。 */
+    public Map<Long, CourseListItemResponse> detailsByIds(Collection<Long> courseIds) {
+        if (courseIds == null || courseIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Course> courses = courseMapper.selectBatchIds(courseIds);
+        if (courses.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = courses.stream().map(Course::getId).toList();
+        Map<Long, List<SubjectBrief>> extraSubjects = extraSubjects(ids);
+        Set<Long> subjectIds = new HashSet<>();
+        for (Course course : courses) {
+            if (course.getSubjectId() != null) {
+                subjectIds.add(course.getSubjectId());
+            }
+            extraSubjects.getOrDefault(course.getId(), List.of())
+                    .forEach(subject -> subjectIds.add(subject.id()));
+        }
+        Map<Long, SubjectBrief> briefs = subjectService.briefsByIds(subjectIds);
+        Map<Long, CourseListItemResponse> result = new HashMap<>();
+        for (Course course : courses) {
+            result.put(course.getId(), new CourseListItemResponse(
+                    course.getId(), course.getName(), course.getCoverUrl(),
+                    course.getDurationMinutes(), course.getSource(), course.getLink(),
+                    course.getBvid(),
+                    course.getSubjectId() == null ? null : briefs.get(course.getSubjectId()),
+                    extraSubjects.getOrDefault(course.getId(), List.of())));
+        }
+        return result;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void create(CourseRequest request) {
         CourseImportData data = normalizeAndValidate(request.subjectId(), request.subjectIds(),

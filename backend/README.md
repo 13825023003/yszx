@@ -87,6 +87,8 @@ com.yunshu.zhixue
 - B站课程库：统计卡、课程 CRUD/筛选/分页、主学科 + 额外学科、BV 唯一性、
   被学习路线引用时阻止删除；Excel 两段式导入（预览 token + 确认），
   列格式为课程名称/所属学科/来源/时长（分钟）/BV号/封面/播放链接；
+- 学习路线：路线 CRUD、发布/下架、学员预览、路线课程添加/移除/排序；
+  删除路线同步逻辑删除 `route_course`，课程被路线引用时反向阻止删除；
 - 学员端/管理端两条独立 SecurityFilterChain，公开路径按 API 04 预置；
 - `@RequirePermission` 权限注解与切面（`PermissionProvider` 待 system 模块实现）；
 - MyBatis-Plus 分页、全表更新拦截、UTC 审计字段自动填充、逻辑删除基类；
