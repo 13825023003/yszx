@@ -14,8 +14,8 @@ import com.yunshu.zhixue.modules.system.SystemConstants;
 import com.yunshu.zhixue.modules.system.dto.OperationLogResponse;
 import com.yunshu.zhixue.modules.system.entity.OperationLog;
 import com.yunshu.zhixue.modules.system.mapper.OperationLogMapper;
-import com.yunshu.zhixue.security.AuthUser;
 import com.yunshu.zhixue.security.SecurityUtils;
+import com.yunshu.zhixue.support.audit.OperationLogRecorder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,12 +38,13 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class OperationLogService {
+public class OperationLogService implements OperationLogRecorder {
 
     private static final DateTimeFormatter CSV_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final OperationLogMapper operationLogMapper;
 
+    @Override
     public void recordCurrent(String action, String targetType, String targetName) {
         SecurityUtils.currentUser().ifPresent(user ->
                 record(user.id(), user.account(), action, targetType, targetName));

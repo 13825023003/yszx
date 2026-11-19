@@ -81,6 +81,9 @@ com.yunshu.zhixue
   `APP_DEFAULT_PASSWORD`，角色为 `super_admin`；
 - 系统管理模块：后台用户 CRUD/批量启停/重置密码、角色与 9 组 34 项权限树、
   操作日志（记录/检索/CSV 导出/清空）、系统设置（4 项配置 upsert）与图片上传；
+- 学科与阶段管理：统计卡、学科/阶段 CRUD、上下移排序、阶段启停、删除保护；
+  关联数量由 course/question/route/interviewbank 通过 subject 模块 SPI 汇总，
+  不跨模块直连数据库；
 - 学员端/管理端两条独立 SecurityFilterChain，公开路径按 API 04 预置；
 - `@RequirePermission` 权限注解与切面（`PermissionProvider` 待 system 模块实现）；
 - MyBatis-Plus 分页、全表更新拦截、UTC 审计字段自动填充、逻辑删除基类；
